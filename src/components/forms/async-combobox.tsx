@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 export interface ComboboxOption {
   value: string;
   label: string;
-  /** Secondary line, e.g. an address under a facility name. */
+  /** Secondary line, e.g. an address under an organisation name. */
   description?: string;
   disabled?: boolean;
 }
@@ -37,7 +37,7 @@ export interface AsyncComboboxProps {
   /**
    * Fetches one page of options. Called with the debounced search term.
    * Implementations should ask the backend to filter — the point of this
-   * component is to avoid downloading every facility to populate a dropdown.
+   * component is to avoid downloading every row of a large table to populate a dropdown.
    */
   loadOptions: (params: {
     search: string;
@@ -66,7 +66,7 @@ export interface AsyncComboboxProps {
 /**
  * A searchable, paginated, API-backed select.
  *
- * Every lookup in the app (`FacilitySelect`, `DepartmentSelect`, …) is a thin
+ * Every API-backed lookup in the app (a "pick an owner" field, say) is a thin
  * wrapper around this, so debouncing, infinite scroll, the selected-label
  * round trip and the keyboard/ARIA behaviour are implemented exactly once.
  */

@@ -28,16 +28,18 @@ export async function POST() {
 
   try {
     const raw = await publicServerApi.post<unknown>("/auth/refresh", { refreshToken });
-    const result = refreshResponseSchema.parse(raw);
+    // Rotation: the token just sent is now dead and the response carries its
+    // replacement. Both cookies must be rewritten, not just the access one.
+    const { tokens } = refreshResponseSchema.parse(raw).data;
 
     await setAuthCookies({
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-      expiresIn: result.expiresIn,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: tokens.expiresIn,
     });
 
     return NextResponse.json({
-      accessToken: env.NEXT_PUBLIC_API_MODE === "direct" ? result.accessToken : undefined,
+      accessToken: env.NEXT_PUBLIC_API_MODE === "direct" ? tokens.accessToken : undefined,
     });
   } catch {
     // A refresh token that the backend rejects is unrecoverable: drop the

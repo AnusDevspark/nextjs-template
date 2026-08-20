@@ -6,9 +6,9 @@ Why the pieces are arranged the way they are.
 
 ## The problem
 
-A CRUD-heavy business application has many modules — Providers, Patients,
-Facilities, Departments, Users, Roles, Appointments, Insurance Plans — that
-differ in every detail and agree on every workflow.
+A CRUD-heavy business application has many modules — Users, Roles, Teams,
+Projects, Invoices, Reports, whatever your domain turns out to be — that differ
+in every detail and agree on every workflow.
 
 Written naively, each module reimplements: a listing page, a table, pagination,
 search, filters, sorting, URL state, loading, empty and error states, create and
@@ -45,7 +45,8 @@ Button, Input, Dialog, Select, Table. shadcn/Radix. No business knowledge.
 **Level 2 — Application building blocks** (`components/`)
 `DataTable`, `PageHeader`, `DetailView`, `FormInput`, `ConfirmDialog`,
 `AsyncCombobox`, `StatusBadge`, `EmptyState`, `ErrorState`. They know about
-_applications_ — pagination, validation, permissions — but not about Providers.
+_applications_ — pagination, validation, permissions — but nothing about your
+domain.
 
 **Level 3 — Workflow engines** (`framework/resource/`)
 `ResourceListPage`, `ResourceCreatePage`, `ResourceEditPage`,
@@ -66,9 +67,9 @@ Enforced by convention and review:
 
 - `framework/` and `components/` never import from `features/`.
 - `features/` may import from any lower layer.
-- Feature-to-feature imports are allowed **at the component level** — Provider's
-  form uses Facility's `FacilitySelect`. Facility owns its lookup; Provider
-  composes it. That is composition, not coupling, and the alternative (a
+- Feature-to-feature imports are allowed **at the component level** — an Invoice
+  form may use a Customer feature's `CustomerSelect`. Customer owns its lookup;
+  Invoice composes it. That is composition, not coupling, and the alternative (a
   `shared/selects/` folder holding every feature's dropdown) is worse.
 
 ---
@@ -86,15 +87,15 @@ That produces two rules:
 
 | File            | Directive      | Why                                                                                                                                                                                                  |
 | --------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `*.resource.ts` | `"use client"` | Contains cell renderers and form components. Marking it client makes the whole definition one client reference, so `<ResourceListPage resource={providerResource} />` works from a Server Component. |
+| `*.resource.ts` | `"use client"` | Contains cell renderers and form components. Marking it client makes the whole definition one client reference, so `<ResourceListPage resource={userResource} />` works from a Server Component. |
 | `*.api.ts`      | none           | Takes an `ApiClient` argument, so the same adapter runs with `clientApi` in the browser and `serverApi` on the server.                                                                               |
 
 The listing page therefore reads:
 
 ```tsx
-export default async function ProvidersPage() {
-  await requirePermission(PERMISSIONS.provider.view);
-  return <ResourceListPage resource={providerResource} />;
+export default async function UsersPage() {
+  await requirePermission(PERMISSIONS.user.view);
+  return <ResourceListPage resource={userResource} />;
 }
 ```
 
@@ -117,16 +118,22 @@ for most admin tables the skeleton is cheaper than the complexity.
 
 The single most valuable boundary in this codebase.
 
-Backends are inconsistent. The three example features prove it with real
-differences:
+The companion `node-template` API is consistent — every response is
+`{ success, message?, data }`, and lists add `meta`. Those shapes are mirrored
+once in `src/lib/api/contract.ts` and documented in `API-CONTRACT.md`, so the
+`user` adapter is thin: unwrap `.data`, hand `meta` to `toListResult`, done.
 
-| Feature    | Envelope                                             | Extra wrinkle                                                 |
-| ---------- | ---------------------------------------------------- | ------------------------------------------------------------- |
-| Provider   | `{ responseData: { message: { items, total } } }`    | `credentials` is a comma-separated string; facility is nested |
-| Facility   | `{ data: { content, totalElements, number, size } }` | Pages are **zero-indexed** upstream                           |
-| Department | `{ items, pagination: { total } }`                   | None — no mapper written                                      |
+The layer earns its keep the moment a second backend appears — a legacy service,
+a partner API, something written by a team with different taste. Envelopes you
+will meet in the wild, and what the adapter does with each:
 
-All three produce:
+| Envelope                                             | What the adapter absorbs                          |
+| ---------------------------------------------------- | ------------------------------------------------- |
+| `{ responseData: { message: { items, total } } }`    | Two layers of nesting nobody above needs to know   |
+| `{ data: { content, totalElements, number, size } }` | Spring conventions, and **zero-indexed** pages     |
+| `{ items, pagination: { total } }`                   | Nothing — no mapper worth writing                 |
+
+Every one of them produces:
 
 ```ts
 type ResourceListResult<T> = {
@@ -135,11 +142,16 @@ type ResourceListResult<T> = {
 };
 ```
 
+`buildPageMeta`, `toListResult`, `toUnknownTotalResult`, `toQueryParams` and
+`pick` in `resource-adapter.ts` exist for exactly this translation — including a
+backend that returns no `total` at all.
+
 Nothing above the adapter knows which backend it is talking to. When a backend
 team changes its envelope, exactly one file changes.
 
-Department deliberately has **no** DTO mapper. Writing one "for symmetry" would
-add a file that copies fields one-to-one — the kind of consistency that costs
+Write a DTO mapper only when the shapes genuinely differ. If the response
+already matches the view model — as `user`'s does — writing one "for symmetry"
+adds a file that copies fields one-to-one: the kind of consistency that costs
 maintenance and buys nothing.
 
 ---
@@ -192,10 +204,10 @@ Only declared filter keys are read, so an injected param is ignored.
 `createQueryKeys(key)` gives every resource the same four-level hierarchy:
 
 ```
-["provider"]                       all provider data
-["provider", "list"]               every list, any query
-["provider", "list", { page: 1 }]  one specific list
-["provider", "detail", "abc"]      one record
+["user"]                       all user data
+["user", "list"]               every list, any query
+["user", "list", { page: 1 }]  one specific list
+["user", "detail", "abc"]      one record
 ```
 
 Because the levels are prefixes, `invalidateQueries({ queryKey: keys.lists() })`

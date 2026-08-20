@@ -49,9 +49,9 @@ export interface ResourceListPageProps<TEntity, TQuery extends BaseListQuery> {
  *
  * A typical page is therefore:
  *
- *   export default async function ProvidersPage() {
- *     await requirePermission(PERMISSIONS.provider.view);
- *     return <ResourceListPage resource={providerResource} />;
+ *   export default async function UsersPage() {
+ *     await requirePermission(PERMISSIONS.user.view);
+ *     return <ResourceListPage resource={userResource} />;
  *   }
  */
 export function ResourceListPage<TEntity, TQuery extends BaseListQuery>({

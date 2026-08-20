@@ -32,18 +32,19 @@ export async function POST(request: NextRequest) {
 
   try {
     const raw = await publicServerApi.post<unknown>("/auth/login", parsed.data);
-    const result = loginResponseSchema.parse(raw);
+    // The API wraps everything in { success, message?, data } — auth included.
+    const { user, tokens } = loginResponseSchema.parse(raw).data;
 
     await setAuthCookies({
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-      expiresIn: result.expiresIn,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: tokens.expiresIn,
     });
 
     return NextResponse.json({
-      user: result.user,
+      user,
       // Only exposed when the browser has to talk to the API directly.
-      accessToken: env.NEXT_PUBLIC_API_MODE === "direct" ? result.accessToken : undefined,
+      accessToken: env.NEXT_PUBLIC_API_MODE === "direct" ? tokens.accessToken : undefined,
     });
   } catch (error) {
     if (isApiError(error)) {

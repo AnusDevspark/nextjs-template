@@ -53,8 +53,12 @@ export interface ApiClientConfig {
    * Called once when a request comes back 401. Return `true` if the caller
    * should retry (i.e. a refresh succeeded). Implementations must be
    * single-flight — see `client-api.ts`.
+   *
+   * Receives the failure's `code` so the implementation can tell a routine
+   * expired token from a terminal one (a revoked session family, a disabled
+   * account) and skip the refresh attempt in the latter case.
    */
-  onUnauthorized?: () => Promise<boolean>;
+  onUnauthorized?: (failure: { code?: string }) => Promise<boolean>;
 }
 
 export function createApiClient(config: ApiClientConfig): ApiClient {
@@ -101,7 +105,11 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
     const canRetry = options.retryOnUnauthorized !== false && Boolean(config.onUnauthorized);
 
     if (response.status === 401 && canRetry) {
-      const refreshed = await config.onUnauthorized!();
+      // Read the failure from a clone: the original body must stay unconsumed
+      // for `parseApiError` below if the retry does not happen.
+      const failure = await parseApiError(response.clone());
+      const refreshed = await config.onUnauthorized!({ code: failure.code });
+
       if (refreshed) {
         // Rebuild headers so the retry picks up the new token.
         const retryHeaders = new Headers({
@@ -157,7 +165,7 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
 /**
  * Joins base and path without collapsing a base path segment.
  *
- * `new URL("/providers", "http://x/api/v1")` yields `http://x/providers`, which
+ * `new URL("/users", "http://x/api/v1")` yields `http://x/users`, which
  * silently drops the version prefix — a bug worth avoiding by hand.
  */
 export function buildUrl(baseUrl: string, path: string, query?: QueryParams): string {

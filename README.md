@@ -6,7 +6,7 @@ one problem:
 > Every business module is different, but the workflow is always the same.
 
 The framework owns **how CRUD works**. A feature describes **what its resource
-contains**. A straightforward module — see `src/features/department/` — is about
+contains**. A straightforward module — see `src/features/user/` — is about
 250 lines of configuration and schema, with no page, form, table or dialog code
 of its own.
 
@@ -168,7 +168,7 @@ src/
 ├── app/                        # routes only; pages are 3–8 lines
 │   ├── (auth)/login/
 │   ├── (dashboard)/            # authenticated shell + providers
-│   │   ├── providers/  facilities/  departments/
+│   │   ├── users/             # list, create, detail, edit
 │   ├── api/auth/               # BFF: login, logout, refresh, session
 │   ├── api/bff/[...path]/      # optional proxy, off by default
 │   ├── forbidden/  error.tsx  global-error.tsx  not-found.tsx
@@ -188,7 +188,7 @@ src/
 │   └── resource-actions.tsx    # row actions from routes + permissions
 │
 ├── features/                   # one folder per business module
-│   ├── auth/  provider/  facility/  department/
+│   ├── auth/  user/           # the worked example
 │
 ├── components/
 │   ├── ui/                     # LEVEL 1 — shadcn primitives
@@ -217,7 +217,7 @@ app → features → framework → components/lib
 ```
 
 Shared infrastructure never imports a feature. Features may compose each other
-at the component level (Provider's form uses `FacilitySelect`), which is normal
+at the component level (an Invoice form using a `CustomerSelect`), which is normal
 composition, not a layering violation.
 
 ### Server vs client boundaries
@@ -231,9 +231,9 @@ client turns the whole definition into a single client reference that a Server
 Component can pass straight through:
 
 ```tsx
-export default async function ProvidersPage() {
-  await requirePermission(PERMISSIONS.provider.view);
-  return <ResourceListPage resource={providerResource} />;
+export default async function UsersPage() {
+  await requirePermission(PERMISSIONS.user.view);
+  return <ResourceListPage resource={userResource} />;
 }
 ```
 
@@ -248,37 +248,37 @@ export default async function ProvidersPage() {
 A definition describes only what is specific to the module:
 
 ```ts
-export const providerResource = defineResource({
-  key: "provider",
-  name: "Provider",
-  pluralName: "Providers",
+export const userResource = defineResource({
+  key: "user",
+  name: "User",
+  pluralName: "Users",
 
   getId: (p) => p.id,
-  getLabel: providerFullName,
+  getLabel: userFullName,
 
   routes: {
-    list: "/providers",
-    create: "/providers/create",
-    detail: (id) => `/providers/${id}`,
-    edit: (id) => `/providers/${id}/edit`,
+    list: "/users",
+    create: "/users/create",
+    detail: (id) => `/users/${id}`,
+    edit: (id) => `/users/${id}/edit`,
   },
 
-  permissions: PERMISSIONS.provider,
-  api: providerApi,
+  permissions: PERMISSIONS.user,
+  api: userApi,
 
   list: {
-    columns: providerColumns,
-    filters: providerFilters,
+    columns: userColumns,
+    filters: userFilters,
     defaultSort: { field: "lastName", order: "asc" },
   },
   form: {
-    schema: providerFormSchema,
-    defaultValues: providerFormDefaults,
-    component: ProviderForm,
+    schema: userFormSchema,
+    defaultValues: userFormDefaults,
+    component: UserForm,
   },
-  details: { sections: providerDetailSections },
+  details: { sections: userDetailSections },
   actions: { custom: [deactivateAction] },
-  export: { path: "/providers/export", formats: ["csv", "xlsx"] },
+  export: { path: "/users/export", formats: ["csv", "xlsx"] },
 });
 ```
 
@@ -314,12 +314,12 @@ and lets you replace the content.
 | Replace            | How                                                     | Example in this repo           |
 | ------------------ | ------------------------------------------------------- | ------------------------------ |
 | The table body     | `list.component`                                        | —                              |
-| One cell           | an ordinary `ColumnDef` with a `cell` function          | `provider.columns.tsx`         |
-| The whole form     | `form.component` (or `createComponent`/`editComponent`) | `provider-form.tsx`            |
+| One cell           | an ordinary `ColumnDef` with a `cell` function          | `user.columns.tsx`         |
+| The whole form     | `form.component` (or `createComponent`/`editComponent`) | `user-form.tsx`            |
 | One field          | `{ type: "custom", render }`                            | —                              |
-| The detail body    | `details.component`                                     | `facility-details.tsx`         |
-| One detail field   | `render` instead of `value`                             | `provider.detail-sections.tsx` |
-| A filter control   | `{ type: "custom", component }`                         | `facility-state-filter.tsx`    |
+| The detail body    | `details.component`                                     | `user-details.tsx`         |
+| One detail field   | `render` instead of `value`                             | `user.detail-sections.tsx` |
+| A filter control   | `{ type: "custom", component }`                         | `user-status-filter.tsx`    |
 | The response shape | the resource's API adapter                              | all three features             |
 
 A custom form still receives a pre-wired `form` instance plus `handleSubmit`,
@@ -353,9 +353,9 @@ the adapter, which is the only file allowed to know about it. All three example
 features use genuinely different envelopes:
 
 ```ts
-// Provider   { responseData: { message: { items, total } } }
-// Facility   { data: { content, totalElements, number, size } }   ← zero-indexed pages
-// Department { items, pagination: { total } }
+// This API   { success, data, meta }                              ← see API-CONTRACT.md
+// Legacy     { responseData: { message: { items, total } } }
+// Spring     { data: { content, totalElements, number, size } }   ← zero-indexed pages
 ```
 
 Every one normalizes to:
@@ -370,15 +370,15 @@ type ResourceListResult<T> = {
 Write one with `createResourceApi`:
 
 ```ts
-export const providerApi = createResourceApi<Provider, CreateInput, UpdateInput, ProviderListQuery>({
+export const userApi = createResourceApi<User, CreateInput, UpdateInput, UserListQuery>({
   list: async (query, { client, signal }) => {
-    const response = await client.get<ProviderListEnvelope>("/providers", {
+    const response = await client.get<ApiPaginated<UserDto>>("/users", {
       query: toQueryParams(query, { search: "q" }), // rename keys here
       signal,
     });
     const payload = response.responseData.message;
 
-    return toListResult(payload.items.map(toProvider), {
+    return toListResult(payload.data.map(toUser), {
       page: query.page,
       pageSize: query.pageSize,
       total: payload.total,
@@ -411,9 +411,10 @@ verbatim.
 
 ### Mappers
 
-Write a DTO → view-model mapper when the shapes genuinely differ (Provider's
-comma-separated `credentials`, Facility's flat address). **Do not** write one
-when they already match — Department has none, deliberately.
+Write a DTO → view-model mapper when the shapes genuinely differ — a
+comma-separated string that should be an array, a flat address that should be
+nested. **Do not** write one when they already match: `user` has none, and that
+is the right call, not an oversight.
 
 ---
 
@@ -424,12 +425,12 @@ type, so a typo is a compile error.
 
 ```ts
 // Server — the frontend gate
-await requirePermission(PERMISSIONS.provider.view);
-const allowed = await sessionCan(PERMISSIONS.provider.edit);
+await requirePermission(PERMISSIONS.user.view);
+const allowed = await sessionCan(PERMISSIONS.user.edit);
 
 // Client — UX only
-const canCreate = usePermission(PERMISSIONS.provider.create);
-<PermissionGuard permission={PERMISSIONS.provider.create}>…</PermissionGuard>;
+const canCreate = usePermission(PERMISSIONS.user.create);
+<PermissionGuard permission={PERMISSIONS.user.create}>…</PermissionGuard>;
 
 // Pure predicates
 hasPermission(set, code);
@@ -474,12 +475,12 @@ Full walkthrough: [`docs/adding-a-resource.md`](docs/adding-a-resource.md).
 Short version — a standard module is five files:
 
 ```
-src/features/appointment/
-├── appointment.types.ts     # entity, status map, list query
-├── appointment.schema.ts    # Zod + defaults
-├── appointment.api.ts       # adapter (plain module)
-├── appointment.columns.tsx  # "use client"
-├── appointment.resource.ts  # "use client"  ← ties it together
+src/features/invoice/
+├── invoice.types.ts     # entity, status map, list query
+├── invoice.schema.ts    # Zod + defaults
+├── invoice.api.ts       # adapter (plain module)
+├── invoice.columns.tsx  # "use client"
+├── invoice.resource.ts  # "use client"  ← ties it together
 └── index.ts
 ```
 

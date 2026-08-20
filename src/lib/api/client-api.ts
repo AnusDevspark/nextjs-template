@@ -3,6 +3,7 @@
 import { clientApiBaseUrl, env } from "@/config/env";
 
 import { createApiClient, type ApiClient } from "./api-client";
+import { isTerminalAuthCode } from "./contract";
 
 /**
  * Browser-side API client, with a single-flight refresh.
@@ -92,8 +93,11 @@ export const clientApi: ApiClient = createApiClient({
   // covers both; the API must send Access-Control-Allow-Credentials in direct
   // mode for this to work.
   credentials: "include",
-  onUnauthorized: async () => {
-    const refreshed = await refreshSession();
+  onUnauthorized: async ({ code }) => {
+    // A revoked session family or a disabled account cannot be refreshed —
+    // attempting it just burns a round trip before the same redirect to /login.
+    // Everything else (an expired or missing access token) is worth a refresh.
+    const refreshed = isTerminalAuthCode(code) ? false : await refreshSession();
 
     if (!refreshed) {
       accessToken = null;

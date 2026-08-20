@@ -92,7 +92,7 @@ export function filenameFromContentDisposition(header: string | null): string | 
   return plain?.[1]?.trim();
 }
 
-/** Timestamped filename, e.g. `providers-2026-08-02.csv`. */
+/** Timestamped filename, e.g. `users-2026-08-02.csv`. */
 export function timestampedFilename(base: string, extension: string): string {
   const date = new Date().toISOString().slice(0, 10);
   return `${base}-${date}.${extension}`;

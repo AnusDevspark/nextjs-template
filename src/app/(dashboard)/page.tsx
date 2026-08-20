@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRightIcon, Building2Icon, NetworkIcon, StethoscopeIcon } from "lucide-react";
+import { ArrowRightIcon, UsersIcon } from "lucide-react";
 
 import { PageHeader } from "@/components/common/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,27 +8,20 @@ import { getSession } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/permissions/permissions";
 import { getUserDisplayName } from "@/types/auth";
 
+/**
+ * The module tiles.
+ *
+ * One entry, because the template ships one resource. Add yours here as you
+ * build them — this list is editorial, like the sidebar, and is not derived
+ * from a registry.
+ */
 const MODULES = [
   {
-    title: "Providers",
-    href: "/providers",
-    icon: StethoscopeIcon,
-    permission: PERMISSIONS.provider.view,
-    description: "Clinicians, specialties and credentials.",
-  },
-  {
-    title: "Facilities",
-    href: "/facilities",
-    icon: Building2Icon,
-    permission: PERMISSIONS.facility.view,
-    description: "Sites, addresses and facility types.",
-  },
-  {
-    title: "Departments",
-    href: "/departments",
-    icon: NetworkIcon,
-    permission: PERMISSIONS.department.view,
-    description: "Organisational units within facilities.",
+    title: "Users",
+    href: "/users",
+    icon: UsersIcon,
+    permission: PERMISSIONS.user.view,
+    description: "People with access to this application.",
   },
 ] as const;
 

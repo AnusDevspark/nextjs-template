@@ -66,7 +66,9 @@ export function ResourceForm<TEntity, TFormValues extends FieldValues>({
     );
   }
 
-  if (!config.fields) {
+  const fields = (mode === "create" ? config.createFields : config.editFields) ?? config.fields;
+
+  if (!fields) {
     throw new Error(
       `Resource "${resource.key}" form needs either \`fields\` (configuration) or \`component\` (custom).`,
     );
@@ -83,7 +85,7 @@ export function ResourceForm<TEntity, TFormValues extends FieldValues>({
     >
       <ResourceFormFields
         form={formState.form}
-        fields={config.fields}
+        fields={fields}
         columns={config.columns}
         disabled={formState.submitting}
       />

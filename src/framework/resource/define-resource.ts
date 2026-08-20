@@ -37,7 +37,7 @@ type ResourceInput<
  * built with `createResourceApi`, and `TFormValues` from `form.schema`. Call
  * sites therefore need no explicit type arguments:
  *
- *   export const providerResource = defineResource({ ... });
+ *   export const userResource = defineResource({ ... });
  *
  * The function itself does almost nothing at runtime — it fills in defaults and
  * returns a frozen object. Keeping it dumb is deliberate: the value of this

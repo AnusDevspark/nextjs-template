@@ -4,28 +4,23 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 
 import { PERMISSIONS } from "@/constants/permissions";
-import { providerResource } from "@/features/provider/provider.resource";
-import { API_URL, makeProvider, providerListEnvelope } from "@/test/msw/handlers";
+import { userResource } from "@/features/user/user.resource";
+import type { User } from "@/features/user";
+import { API_URL, makeUser, paginatedEnvelope } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { lastReplacedSearchParams, routerMock, setSearchParams } from "@/test/router-mock";
 import { renderWithProviders } from "@/test/utils";
 
 import { ResourceListPage } from "./resource-list-page";
 
-const ALL_PROVIDER_PERMISSIONS = [
-  PERMISSIONS.provider.view,
-  PERMISSIONS.provider.create,
-  PERMISSIONS.provider.edit,
-  PERMISSIONS.provider.delete,
+const ALL_USER_PERMISSIONS = [
+  PERMISSIONS.user.view,
+  PERMISSIONS.user.create,
+  PERMISSIONS.user.edit,
+  PERMISSIONS.user.delete,
 ];
 
-/**
- * Finds a row inside the table specifically.
- *
- * Provider declares a `mobileRenderer`, so the engine renders a card list *and*
- * a table, with CSS choosing between them. jsdom applies no CSS, so both are
- * present and an unscoped query would match twice.
- */
+/** Finds a row inside the table specifically, in case a card list is also rendered. */
 async function findRowInTable(text: string): Promise<HTMLElement> {
   const table = await screen.findByRole("table");
   return within(table).findByText(text);
@@ -36,8 +31,8 @@ async function findRowInTable(text: string): Promise<HTMLElement> {
  *
  * These are the highest-value tests in the codebase: they cover behaviour that
  * every module inherits, so a regression here would otherwise surface as the
- * same bug in fifteen features at once. Because they run against the real
- * Provider resource, they also prove the definition format works end to end.
+ * same bug in every feature at once. Because they run against the real User
+ * resource, they also prove the definition format works end to end.
  *
  * Feature-level tests can then be short, and test only what is specific to that
  * feature — that is a large part of where the code reduction comes from.
@@ -45,49 +40,47 @@ async function findRowInTable(text: string): Promise<HTMLElement> {
 describe("ResourceListPage", () => {
   it("renders the resource's columns and rows", async () => {
     server.use(
-      http.get(`${API_URL}/providers`, () =>
+      http.get(`${API_URL}/users`, () =>
         HttpResponse.json(
-          providerListEnvelope(
-            [
-              makeProvider({ id: "p1", firstName: "Ada", lastName: "Lovelace" }),
-              makeProvider({
-                id: "p2",
-                firstName: "Grace",
-                lastName: "Hopper",
-                email: "grace@example.com",
-              }),
-            ],
-            2,
-          ),
+          paginatedEnvelope([
+            makeUser({ id: "u1", firstName: "Ada", lastName: "Lovelace", fullName: "Ada Lovelace" }),
+            makeUser({
+              id: "u2",
+              firstName: "Grace",
+              lastName: "Hopper",
+              fullName: "Grace Hopper",
+              email: "grace@example.com",
+            }),
+          ]),
         ),
       ),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: ALL_PROVIDER_PERMISSIONS,
+    renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: ALL_USER_PERMISSIONS,
     });
 
     expect(await findRowInTable("Ada Lovelace")).toBeInTheDocument();
     expect(await findRowInTable("Grace Hopper")).toBeInTheDocument();
 
     // Column headers come from the resource definition.
-    expect(screen.getByRole("columnheader", { name: /provider/i })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /name/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /status/i })).toBeInTheDocument();
 
-    // A custom cell rendered a real component, not a stringified value.
+    // A status column rendered a real badge, not a stringified value.
     expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
   });
 
   it("shows a skeleton while the first page loads", () => {
     server.use(
-      http.get(`${API_URL}/providers`, async () => {
+      http.get(`${API_URL}/users`, async () => {
         await new Promise((resolve) => setTimeout(resolve, 200));
-        return HttpResponse.json(providerListEnvelope([makeProvider()]));
+        return HttpResponse.json(paginatedEnvelope([makeUser()]));
       }),
     );
 
-    const { container } = renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: ALL_PROVIDER_PERMISSIONS,
+    const { container } = renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: ALL_USER_PERMISSIONS,
     });
 
     expect(container.querySelector('[data-slot="skeleton"]')).toBeInTheDocument();
@@ -95,41 +88,44 @@ describe("ResourceListPage", () => {
 
   it("shows an empty state when there are no records", async () => {
     server.use(
-      http.get(`${API_URL}/providers`, () => HttpResponse.json(providerListEnvelope([], 0))),
+      http.get(`${API_URL}/users`, () => HttpResponse.json(paginatedEnvelope<User>([], { total: 0 }))),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: ALL_PROVIDER_PERMISSIONS,
+    renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: ALL_USER_PERMISSIONS,
     });
 
-    expect(await screen.findByText(/no providers yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no users yet/i)).toBeInTheDocument();
   });
 
   it("distinguishes 'no results for these filters' from 'nothing exists'", async () => {
     setSearchParams("status=SUSPENDED");
     server.use(
-      http.get(`${API_URL}/providers`, () => HttpResponse.json(providerListEnvelope([], 0))),
+      http.get(`${API_URL}/users`, () => HttpResponse.json(paginatedEnvelope<User>([], { total: 0 }))),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: ALL_PROVIDER_PERMISSIONS,
+    renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: ALL_USER_PERMISSIONS,
     });
 
-    // Telling someone to "create their first provider" when they simply typed a
-    // bad filter is misleading.
-    expect(await screen.findByText(/no providers match your filters/i)).toBeInTheDocument();
+    // Telling someone to "create their first user" when they simply typed a bad
+    // filter is misleading.
+    expect(await screen.findByText(/no users match your filters/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /clear filters/i })).toBeInTheDocument();
   });
 
   it("shows an error state with a retry when the request fails", async () => {
     server.use(
-      http.get(`${API_URL}/providers`, () =>
-        HttpResponse.json({ message: "Upstream exploded" }, { status: 500 }),
+      http.get(`${API_URL}/users`, () =>
+        HttpResponse.json(
+          { success: false, message: "Upstream exploded", code: "INTERNAL_ERROR" },
+          { status: 500 },
+        ),
       ),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: ALL_PROVIDER_PERMISSIONS,
+    renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: ALL_USER_PERMISSIONS,
     });
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
@@ -141,13 +137,13 @@ describe("ResourceListPage", () => {
   it("writes the page number to the URL when paging", async () => {
     const user = userEvent.setup();
     server.use(
-      http.get(`${API_URL}/providers`, () =>
-        HttpResponse.json(providerListEnvelope([makeProvider()], 120)),
+      http.get(`${API_URL}/users`, () =>
+        HttpResponse.json(paginatedEnvelope([makeUser()], { total: 120 })),
       ),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: ALL_PROVIDER_PERMISSIONS,
+    renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: ALL_USER_PERMISSIONS,
     });
 
     await findRowInTable("Ada Lovelace");
@@ -161,13 +157,13 @@ describe("ResourceListPage", () => {
     const user = userEvent.setup();
     setSearchParams("page=4");
     server.use(
-      http.get(`${API_URL}/providers`, () =>
-        HttpResponse.json(providerListEnvelope([makeProvider()], 120)),
+      http.get(`${API_URL}/users`, () =>
+        HttpResponse.json(paginatedEnvelope([makeUser()], { total: 120 })),
       ),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: ALL_PROVIDER_PERMISSIONS,
+    renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: ALL_USER_PERMISSIONS,
     });
 
     await findRowInTable("Ada Lovelace");
@@ -183,13 +179,11 @@ describe("ResourceListPage", () => {
   it("cycles sort order through the column header", async () => {
     const user = userEvent.setup();
     server.use(
-      http.get(`${API_URL}/providers`, () =>
-        HttpResponse.json(providerListEnvelope([makeProvider()], 1)),
-      ),
+      http.get(`${API_URL}/users`, () => HttpResponse.json(paginatedEnvelope([makeUser()]))),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: ALL_PROVIDER_PERMISSIONS,
+    renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: ALL_USER_PERMISSIONS,
     });
 
     await findRowInTable("Ada Lovelace");
@@ -203,34 +197,30 @@ describe("ResourceListPage", () => {
 
   it("hides the create button without the create permission", async () => {
     server.use(
-      http.get(`${API_URL}/providers`, () =>
-        HttpResponse.json(providerListEnvelope([makeProvider()], 1)),
-      ),
+      http.get(`${API_URL}/users`, () => HttpResponse.json(paginatedEnvelope([makeUser()]))),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: [PERMISSIONS.provider.view],
+    renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: [PERMISSIONS.user.view],
     });
 
     await findRowInTable("Ada Lovelace");
-    expect(screen.queryByRole("link", { name: /new provider/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /new user/i })).not.toBeInTheDocument();
   });
 
   it("shows the create button with the create permission", async () => {
     server.use(
-      http.get(`${API_URL}/providers`, () =>
-        HttpResponse.json(providerListEnvelope([makeProvider()], 1)),
-      ),
+      http.get(`${API_URL}/users`, () => HttpResponse.json(paginatedEnvelope([makeUser()]))),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: ALL_PROVIDER_PERMISSIONS,
+    renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: ALL_USER_PERMISSIONS,
     });
 
     await findRowInTable("Ada Lovelace");
-    expect(screen.getByRole("link", { name: /new provider/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /new user/i })).toHaveAttribute(
       "href",
-      "/providers/create",
+      "/users/create",
     );
   });
 
@@ -239,17 +229,15 @@ describe("ResourceListPage", () => {
     let deleteCalled = false;
 
     server.use(
-      http.get(`${API_URL}/providers`, () =>
-        HttpResponse.json(providerListEnvelope([makeProvider()], 1)),
-      ),
-      http.delete(`${API_URL}/providers/:id`, () => {
+      http.get(`${API_URL}/users`, () => HttpResponse.json(paginatedEnvelope([makeUser()]))),
+      http.delete(`${API_URL}/users/:id`, () => {
         deleteCalled = true;
         return new HttpResponse(null, { status: 204 });
       }),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: ALL_PROVIDER_PERMISSIONS,
+    renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: ALL_USER_PERMISSIONS,
     });
 
     await findRowInTable("Ada Lovelace");
@@ -271,17 +259,17 @@ describe("ResourceListPage", () => {
     let deletedId: string | undefined;
 
     server.use(
-      http.get(`${API_URL}/providers`, () =>
-        HttpResponse.json(providerListEnvelope([makeProvider({ id: "p9" })], 1)),
+      http.get(`${API_URL}/users`, () =>
+        HttpResponse.json(paginatedEnvelope([makeUser({ id: "u9" })])),
       ),
-      http.delete(`${API_URL}/providers/:id`, ({ params }) => {
+      http.delete(`${API_URL}/users/:id`, ({ params }) => {
         deletedId = String(params.id);
         return new HttpResponse(null, { status: 204 });
       }),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: ALL_PROVIDER_PERMISSIONS,
+    renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: ALL_USER_PERMISSIONS,
     });
 
     await findRowInTable("Ada Lovelace");
@@ -292,19 +280,17 @@ describe("ResourceListPage", () => {
     const dialog = await screen.findByRole("alertdialog");
     await user.click(within(dialog).getByRole("button", { name: /^delete$/i }));
 
-    await waitFor(() => expect(deletedId).toBe("p9"));
+    await waitFor(() => expect(deletedId).toBe("u9"));
   });
 
   it("omits the delete action without the delete permission", async () => {
     const user = userEvent.setup();
     server.use(
-      http.get(`${API_URL}/providers`, () =>
-        HttpResponse.json(providerListEnvelope([makeProvider()], 1)),
-      ),
+      http.get(`${API_URL}/users`, () => HttpResponse.json(paginatedEnvelope([makeUser()]))),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: [PERMISSIONS.provider.view],
+    renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: [PERMISSIONS.user.view],
     });
 
     await findRowInTable("Ada Lovelace");
@@ -316,43 +302,63 @@ describe("ResourceListPage", () => {
 
   it("hides a custom action when its `visible` predicate fails", async () => {
     const user = userEvent.setup();
+
+    // Declared here rather than on the shipped resource: custom row actions are
+    // a framework feature every module can use, but User has no business need
+    // for one, and inventing a "Suspend" button just to test the engine would
+    // put fiction in the template.
+    const resourceWithAction = {
+      ...userResource,
+      list: {
+        ...userResource.list,
+        actions: [
+          {
+            id: "suspend",
+            label: "Suspend",
+            onSelect: () => {},
+            visible: (user: User) => user.status === "ACTIVE",
+          },
+        ],
+      },
+    } as typeof userResource;
+
     server.use(
-      http.get(`${API_URL}/providers`, () =>
-        HttpResponse.json(providerListEnvelope([makeProvider({ status: "INACTIVE" })], 1)),
+      http.get(`${API_URL}/users`, () =>
+        HttpResponse.json(paginatedEnvelope([makeUser({ status: "INACTIVE" })])),
       ),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: ALL_PROVIDER_PERMISSIONS,
+    renderWithProviders(<ResourceListPage resource={resourceWithAction} />, {
+      permissions: ALL_USER_PERMISSIONS,
     });
 
     await findRowInTable("Ada Lovelace");
     await user.click(screen.getByRole("button", { name: /actions for ada lovelace/i }));
 
-    // "Deactivate" only applies to an ACTIVE provider.
-    expect(screen.queryByRole("menuitem", { name: /deactivate/i })).not.toBeInTheDocument();
+    // "Suspend" only applies to an ACTIVE user.
+    expect(screen.queryByRole("menuitem", { name: /suspend/i })).not.toBeInTheDocument();
   });
 
   it("sends the resource's default sort on the first request", async () => {
     let requestUrl = "";
 
     server.use(
-      http.get(`${API_URL}/providers`, ({ request }) => {
+      http.get(`${API_URL}/users`, ({ request }) => {
         requestUrl = request.url;
-        return HttpResponse.json(providerListEnvelope([makeProvider()], 1));
+        return HttpResponse.json(paginatedEnvelope([makeUser()]));
       }),
     );
 
-    renderWithProviders(<ResourceListPage resource={providerResource} />, {
-      permissions: ALL_PROVIDER_PERMISSIONS,
+    renderWithProviders(<ResourceListPage resource={userResource} />, {
+      permissions: ALL_USER_PERMISSIONS,
     });
 
     await findRowInTable("Ada Lovelace");
 
     const params = new URL(requestUrl).searchParams;
-    expect(params.get("sortBy")).toBe("lastName");
-    expect(params.get("sortOrder")).toBe("asc");
-    // The adapter renames `search` to `q` for this backend.
-    expect(params.has("search")).toBe(false);
+    expect(params.get("sortBy")).toBe("createdAt");
+    expect(params.get("sortOrder")).toBe("desc");
+    // No rename map: the API already speaks `search`, `page` and `pageSize`.
+    expect(params.get("page")).toBe("1");
   });
 });

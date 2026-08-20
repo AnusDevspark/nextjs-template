@@ -1,6 +1,12 @@
 # Adding a resource
 
-A worked example: adding an **Appointment** module.
+A worked example: adding a **Task** module — a scheduled unit of work assigned
+to a user.
+
+The domain is deliberately dull; the point is the *shape*. This template ships
+no business domain, so substitute your own nouns as you read. Task pairs with
+the backend tutorial in `node-template/docs/adding-a-module.md` — build both and
+they talk to each other.
 
 ---
 
@@ -18,14 +24,14 @@ are "the standard thing", and every "no" points at a specific escape hatch.
 | 5   | Do create and edit differ materially?                 | `createComponent` / `editComponent`, or `createSchema` / `editSchema` | One `component` / `fields` and one `schema`                                                    |
 | 6   | Is the detail page label/value pairs?                 | `details.sections`                                                    | `details.component`                                                                            |
 | 7   | Does the backend response match `ResourceListResult`? | Map it directly                                                       | Normalize it in the adapter (that is what the adapter is for)                                  |
-| 8   | Does the DTO match the UI shape?                      | Skip the mapper                                                       | Write `toAppointment(dto)`                                                                     |
+| 8   | Does the DTO match the UI shape?                      | Skip the mapper                                                       | Write `toTask(dto)`                                                                     |
 | 9   | Which permissions guard it?                           | Add them to `PERMISSIONS`                                             | —                                                                                              |
 | 10  | Are there non-CRUD business actions?                  | `actions.custom` + a plain exported API function                      | —                                                                                              |
 
-For Appointment, assume: standard CRUD, a table, one custom cell (a time range),
+For Task, assume: standard CRUD, a table, one custom cell (a time range),
 a custom form (it has a duration/end-time interaction), standard details, a
 `{ data, meta }` envelope, a DTO that needs light mapping, and one business
-action ("Cancel appointment").
+action ("Cancel task").
 
 ---
 
@@ -36,11 +42,11 @@ action ("Cancel appointment").
 ```ts
 export const PERMISSIONS = {
   // …
-  appointment: {
-    view: "APPOINTMENT_VIEW",
-    create: "APPOINTMENT_CREATE",
-    edit: "APPOINTMENT_EDIT",
-    delete: "APPOINTMENT_DELETE",
+  task: {
+    view: "TASK_VIEW",
+    create: "TASK_CREATE",
+    edit: "TASK_EDIT",
+    delete: "TASK_DELETE",
   },
 } as const;
 ```
@@ -52,91 +58,91 @@ typo-checked.
 
 ## Step 2 — Types
 
-`src/features/appointment/appointment.types.ts`:
+`src/features/task/task.types.ts`:
 
 ```ts
 import type { StatusMap } from "@/components/common/status-badge";
 import type { BaseListQuery } from "@/lib/query/list-query";
 
-export const APPOINTMENT_STATUSES = ["SCHEDULED", "COMPLETED", "CANCELLED", "NO_SHOW"] as const;
-export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number];
+export const TASK_STATUSES = ["SCHEDULED", "COMPLETED", "CANCELLED", "NO_SHOW"] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
 
-export const appointmentStatusMap: StatusMap<AppointmentStatus> = {
+export const taskStatusMap: StatusMap<TaskStatus> = {
   SCHEDULED: { tone: "info", label: "Scheduled" },
   COMPLETED: { tone: "success", label: "Completed" },
   CANCELLED: { tone: "muted", label: "Cancelled" },
   NO_SHOW: { tone: "danger", label: "No show" },
 };
 
-export interface Appointment {
+export interface Task {
   id: string;
-  patientName: string;
-  providerId: string;
-  providerName: string;
-  facilityId: string;
+  title: string;
+  assigneeId: string;
+  assigneeName: string;
+  teamId: string;
   startsAt: string;
   endsAt: string;
-  status: AppointmentStatus;
+  status: TaskStatus;
   reason: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreateAppointmentInput {
-  patientName: string;
-  providerId: string;
-  facilityId: string;
+export interface CreateTaskInput {
+  title: string;
+  assigneeId: string;
+  teamId: string;
   startsAt: string;
   durationMinutes: number;
   reason?: string | null;
 }
 
-export type UpdateAppointmentInput = Partial<CreateAppointmentInput>;
+export type UpdateTaskInput = Partial<CreateTaskInput>;
 
-export type AppointmentListQuery = BaseListQuery & {
+export type TaskListQuery = BaseListQuery & {
   status?: string;
-  providerId?: string;
+  assigneeId?: string;
   dateFrom?: string;
   dateTo?: string;
 };
 
-export const appointmentStatusOptions = APPOINTMENT_STATUSES.map((value) => ({
+export const taskStatusOptions = TASK_STATUSES.map((value) => ({
   value,
-  label: appointmentStatusMap[value].label ?? value,
+  label: taskStatusMap[value].label ?? value,
 }));
 ```
 
 The status map lives with the feature. `CANCELLED` means something different for
-an appointment than for an invoice, and a global status registry would force one
+a task than for an invoice, and a global status registry would force one
 meaning onto both.
 
 ---
 
 ## Step 3 — API adapter
 
-`src/features/appointment/appointment.api.ts` — a **plain module**, no
+`src/features/task/task.api.ts` — a **plain module**, no
 `"use client"`, so a Server Component can also call it.
 
 ```ts
 import { createResourceApi, toListResult, toQueryParams } from "@/framework/resource";
 
 import type {
-  Appointment,
-  AppointmentListQuery,
-  CreateAppointmentInput,
-  UpdateAppointmentInput,
-} from "./appointment.types";
+  Task,
+  TaskListQuery,
+  CreateTaskInput,
+  UpdateTaskInput,
+} from "./task.types";
 
-interface AppointmentEnvelope {
-  data: AppointmentDto[];
+interface TaskEnvelope {
+  data: TaskDto[];
   meta: { total: number; page: number; perPage: number };
 }
 
-interface AppointmentDto {
+interface TaskDto {
   id: string;
-  patient: { name: string };
-  provider: { id: string; name: string };
-  facilityId: string;
+  requester: { name: string };
+  user: { id: string; name: string };
+  teamId: string;
   startsAt: string;
   endsAt: string;
   status: string;
@@ -145,35 +151,35 @@ interface AppointmentDto {
   updatedAt: string;
 }
 
-function toAppointment(dto: AppointmentDto): Appointment {
+function toTask(dto: TaskDto): Task {
   return {
     id: dto.id,
-    patientName: dto.patient.name,
-    providerId: dto.provider.id,
-    providerName: dto.provider.name,
-    facilityId: dto.facilityId,
+    title: dto.requester.name,
+    assigneeId: dto.user.id,
+    assigneeName: dto.user.name,
+    teamId: dto.teamId,
     startsAt: dto.startsAt,
     endsAt: dto.endsAt,
-    status: dto.status as Appointment["status"],
+    status: dto.status as Task["status"],
     reason: dto.reason,
     createdAt: dto.createdAt,
     updatedAt: dto.updatedAt,
   };
 }
 
-export const appointmentApi = createResourceApi<
-  Appointment,
-  CreateAppointmentInput,
-  UpdateAppointmentInput,
-  AppointmentListQuery
+export const taskApi = createResourceApi<
+  Task,
+  CreateTaskInput,
+  UpdateTaskInput,
+  TaskListQuery
 >({
   list: async (query, { client, signal }) => {
-    const response = await client.get<AppointmentEnvelope>("/appointments", {
+    const response = await client.get<TaskEnvelope>("/tasks", {
       query: toQueryParams(query, { pageSize: "perPage" }),
       signal,
     });
 
-    return toListResult(response.data.map(toAppointment), {
+    return toListResult(response.data.map(toTask), {
       page: response.meta.page,
       pageSize: response.meta.perPage,
       total: response.meta.total,
@@ -181,34 +187,34 @@ export const appointmentApi = createResourceApi<
   },
 
   getById: async (id, { client, signal }) => {
-    const response = await client.get<{ data: AppointmentDto }>(`/appointments/${id}`, { signal });
-    return toAppointment(response.data);
+    const response = await client.get<{ data: TaskDto }>(`/tasks/${id}`, { signal });
+    return toTask(response.data);
   },
 
   create: async (data, { client, signal }) => {
-    const response = await client.post<{ data: AppointmentDto }>("/appointments", data, { signal });
-    return toAppointment(response.data);
+    const response = await client.post<{ data: TaskDto }>("/tasks", data, { signal });
+    return toTask(response.data);
   },
 
   update: async (id, data, { client, signal }) => {
-    const response = await client.patch<{ data: AppointmentDto }>(`/appointments/${id}`, data, {
+    const response = await client.patch<{ data: TaskDto }>(`/tasks/${id}`, data, {
       signal,
     });
-    return toAppointment(response.data);
+    return toTask(response.data);
   },
 
   remove: async (id, { client, signal }) => {
-    await client.delete(`/appointments/${id}`, { signal });
+    await client.delete(`/tasks/${id}`, { signal });
   },
 });
 
 /** A business action, not CRUD — an ordinary exported function. */
-export async function cancelAppointment(
+export async function cancelTask(
   id: string,
   reason: string,
-  client: Parameters<typeof appointmentApi.getById>[1]["client"],
+  client: Parameters<typeof taskApi.getById>[1]["client"],
 ): Promise<void> {
-  await client.post(`/appointments/${id}/cancel`, { reason });
+  await client.post(`/tasks/${id}/cancel`, { reason });
 }
 ```
 
@@ -216,41 +222,41 @@ export async function cancelAppointment(
 
 ## Step 4 — Schema
 
-`src/features/appointment/appointment.schema.ts`:
+`src/features/task/task.schema.ts`:
 
 ```ts
 import { z } from "zod";
 
-export const appointmentFormSchema = z.object({
-  patientName: z.string().min(1, "Patient name is required").max(120),
-  providerId: z.string().min(1, "Select a provider"),
-  facilityId: z.string().min(1, "Select a facility"),
+export const taskFormSchema = z.object({
+  title: z.string().min(1, "Title is required").max(120),
+  assigneeId: z.string().min(1, "Select a user"),
+  teamId: z.string().min(1, "Select a team"),
   startsAt: z.string().min(1, "Select a start time"),
   durationMinutes: z.number().int().min(5).max(480),
   reason: z.string().max(500).optional().default(""),
 });
 
-export type AppointmentFormValues = z.infer<typeof appointmentFormSchema>;
+export type TaskFormValues = z.infer<typeof taskFormSchema>;
 
-export const appointmentFormDefaults: AppointmentFormValues = {
-  patientName: "",
-  providerId: "",
-  facilityId: "",
+export const taskFormDefaults: TaskFormValues = {
+  title: "",
+  assigneeId: "",
+  teamId: "",
   startsAt: "",
   durationMinutes: 30,
   reason: "",
 };
 ```
 
-Validate what the user can see and fix. "Does this provider already have an
-appointment at 09:00?" is the backend's answer, and it arrives as an `ApiError`
+Validate what the user can see and fix. "Does this user already have an
+task at 09:00?" is the backend's answer, and it arrives as an `ApiError`
 that the framework maps onto the right field.
 
 ---
 
 ## Step 5 — Columns
 
-`src/features/appointment/appointment.columns.tsx` — `"use client"`, because
+`src/features/task/task.columns.tsx` — `"use client"`, because
 cells are components.
 
 ```tsx
@@ -262,13 +268,13 @@ import { StatusBadge } from "@/components/common/status-badge";
 import { createStatusColumn, createTextColumn } from "@/components/data-table";
 import { formatDateTime } from "@/lib/formatters";
 
-import { appointmentStatusMap, type Appointment } from "./appointment.types";
+import { taskStatusMap, type Task } from "./task.types";
 
-export const appointmentColumns: ColumnDef<Appointment, unknown>[] = [
-  createTextColumn<Appointment>({
-    id: "patientName",
-    header: "Patient",
-    sortField: "patientName",
+export const taskColumns: ColumnDef<Task, unknown>[] = [
+  createTextColumn<Task>({
+    id: "title",
+    header: "Title",
+    sortField: "title",
     enableHiding: false,
   }),
 
@@ -287,18 +293,18 @@ export const appointmentColumns: ColumnDef<Appointment, unknown>[] = [
     ),
   },
 
-  createTextColumn<Appointment>({
-    id: "providerName",
-    header: "Provider",
-    sortField: "providerName",
+  createTextColumn<Task>({
+    id: "assigneeName",
+    header: "User",
+    sortField: "assigneeName",
     truncate: true,
   }),
 
-  createStatusColumn<Appointment, Appointment["status"]>({
+  createStatusColumn<Task, Task["status"]>({
     id: "status",
     header: "Status",
     sortField: "status",
-    map: appointmentStatusMap,
+    map: taskStatusMap,
   }),
 ];
 ```
@@ -307,7 +313,7 @@ export const appointmentColumns: ColumnDef<Appointment, unknown>[] = [
 
 ## Step 6 — Resource definition
 
-`src/features/appointment/appointment.resource.ts` — `"use client"`.
+`src/features/task/task.resource.ts` — `"use client"`.
 
 ```ts
 "use client";
@@ -319,58 +325,58 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { defineResource } from "@/framework/resource";
 import { clientApi } from "@/lib/api";
 
-import { AppointmentForm } from "./components/appointment-form";
-import { appointmentApi, cancelAppointment } from "./appointment.api";
-import { appointmentColumns } from "./appointment.columns";
-import { appointmentFormDefaults, appointmentFormSchema } from "./appointment.schema";
-import { appointmentStatusOptions, type Appointment } from "./appointment.types";
+import { TaskForm } from "./components/task-form";
+import { taskApi, cancelTask } from "./task.api";
+import { taskColumns } from "./task.columns";
+import { taskFormDefaults, taskFormSchema } from "./task.schema";
+import { taskStatusOptions, type Task } from "./task.types";
 
-const sections: DetailSection<Appointment>[] = [
+const sections: DetailSection<Task>[] = [
   {
-    title: "Appointment",
+    title: "Task",
     fields: [
-      textField<Appointment>("Patient", (a) => a.patientName),
-      textField<Appointment>("Provider", (a) => a.providerName),
-      dateTimeField<Appointment>("Starts", (a) => a.startsAt),
-      dateTimeField<Appointment>("Ends", (a) => a.endsAt),
-      textField<Appointment>("Reason", (a) => a.reason),
+      textField<Task>("Title", (a) => a.title),
+      textField<Task>("User", (a) => a.assigneeName),
+      dateTimeField<Task>("Starts", (a) => a.startsAt),
+      dateTimeField<Task>("Ends", (a) => a.endsAt),
+      textField<Task>("Reason", (a) => a.reason),
     ],
   },
 ];
 
-export const appointmentResource = defineResource({
-  key: "appointment",
-  name: "Appointment",
-  pluralName: "Appointments",
-  description: "Scheduled visits between patients and providers.",
+export const taskResource = defineResource({
+  key: "task",
+  name: "Task",
+  pluralName: "Tasks",
+  description: "Scheduled units of work assigned to a user.",
 
-  getId: (a: Appointment) => a.id,
-  getLabel: (a: Appointment) => `${a.patientName} — ${a.providerName}`,
+  getId: (a: Task) => a.id,
+  getLabel: (a: Task) => `${a.title} — ${a.assigneeName}`,
 
   routes: {
-    list: "/appointments",
-    create: "/appointments/create",
-    detail: (id) => `/appointments/${id}`,
-    edit: (id) => `/appointments/${id}/edit`,
+    list: "/tasks",
+    create: "/tasks/create",
+    detail: (id) => `/tasks/${id}`,
+    edit: (id) => `/tasks/${id}/edit`,
   },
 
-  permissions: PERMISSIONS.appointment,
-  api: appointmentApi,
+  permissions: PERMISSIONS.task,
+  api: taskApi,
 
   list: {
-    columns: appointmentColumns,
+    columns: taskColumns,
     filters: [
-      { key: "status", type: "select", label: "Status", options: appointmentStatusOptions },
+      { key: "status", type: "select", label: "Status", options: taskStatusOptions },
       { key: "date", type: "date-range", label: "Date" },
     ],
     defaultSort: { field: "startsAt", order: "desc" },
-    searchPlaceholder: "Search by patient or provider…",
+    searchPlaceholder: "Search by title or assignee…",
   },
 
   form: {
-    schema: appointmentFormSchema,
-    defaultValues: appointmentFormDefaults,
-    component: AppointmentForm, // start/duration interact — Mode 2
+    schema: taskFormSchema,
+    defaultValues: taskFormDefaults,
+    component: TaskForm, // start/duration interact — Mode 2
   },
 
   details: { sections },
@@ -379,19 +385,19 @@ export const appointmentResource = defineResource({
     custom: [
       {
         key: "cancel",
-        label: "Cancel appointment",
+        label: "Cancel task",
         icon: XCircleIcon,
-        permission: PERMISSIONS.appointment.edit,
+        permission: PERMISSIONS.task.edit,
         variant: "destructive",
         visible: (a) => a.status === "SCHEDULED",
         confirm: (a) => ({
-          title: "Cancel appointment?",
-          description: `${a.patientName}'s appointment will be cancelled and the slot released.`,
-          confirmLabel: "Cancel appointment",
+          title: "Cancel task?",
+          description: `${a.title}'s task will be cancelled and the slot released.`,
+          confirmLabel: "Cancel task",
           destructive: true,
         }),
         onClick: async (a, { refresh }) => {
-          await cancelAppointment(a.id, "Cancelled from list", clientApi);
+          await cancelTask(a.id, "Cancelled from list", clientApi);
           refresh();
         },
       },
@@ -407,23 +413,23 @@ Note the `date-range` filter: it writes `dateFrom` and `dateTo` to the URL, and
 
 ## Step 7 — Barrel
 
-`src/features/appointment/index.ts`:
+`src/features/task/index.ts`:
 
 ```ts
-export { appointmentResource } from "./appointment.resource";
-export { appointmentApi, cancelAppointment } from "./appointment.api";
+export { taskResource } from "./task.resource";
+export { taskApi, cancelTask } from "./task.api";
 export {
-  appointmentStatusMap,
-  appointmentStatusOptions,
-  type Appointment,
-  type AppointmentStatus,
-  type AppointmentListQuery,
-} from "./appointment.types";
+  taskStatusMap,
+  taskStatusOptions,
+  type Task,
+  type TaskStatus,
+  type TaskListQuery,
+} from "./task.types";
 export {
-  appointmentFormSchema,
-  appointmentFormDefaults,
-  type AppointmentFormValues,
-} from "./appointment.schema";
+  taskFormSchema,
+  taskFormDefaults,
+  type TaskFormValues,
+} from "./task.schema";
 ```
 
 ---
@@ -432,22 +438,22 @@ export {
 
 Four files, each 3–8 lines.
 
-`src/app/(dashboard)/appointments/page.tsx`:
+`src/app/(dashboard)/tasks/page.tsx`:
 
 ```tsx
 import type { Metadata } from "next";
 
 import { PERMISSIONS } from "@/constants/permissions";
-import { appointmentResource } from "@/features/appointment";
+import { taskResource } from "@/features/task";
 import { ResourceListPage } from "@/framework/resource";
 import { requirePermission } from "@/lib/auth/session";
 
-export const metadata: Metadata = { title: "Appointments" };
+export const metadata: Metadata = { title: "Tasks" };
 
-export default async function AppointmentsPage() {
-  await requirePermission(PERMISSIONS.appointment.view, { returnTo: "/appointments" });
+export default async function TasksPage() {
+  await requirePermission(PERMISSIONS.task.view, { returnTo: "/tasks" });
 
-  return <ResourceListPage resource={appointmentResource} />;
+  return <ResourceListPage resource={taskResource} />;
 }
 ```
 
@@ -456,15 +462,15 @@ shape with `ResourceCreatePage`, `ResourceDetailPage` and `ResourceEditPage`.
 Remember that `params` is a Promise in Next.js 16:
 
 ```tsx
-export default async function AppointmentDetailPage({
+export default async function TaskDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  await requirePermission(PERMISSIONS.appointment.view, { returnTo: `/appointments/${id}` });
+  await requirePermission(PERMISSIONS.task.view, { returnTo: `/tasks/${id}` });
 
-  return <ResourceDetailPage resource={appointmentResource} id={id} />;
+  return <ResourceDetailPage resource={taskResource} id={id} />;
 }
 ```
 
@@ -476,32 +482,32 @@ export default async function AppointmentDetailPage({
 
 ```ts
 {
-  title: "Appointments",
-  href: "/appointments",
+  title: "Tasks",
+  href: "/tasks",
   icon: CalendarIcon,
-  permission: PERMISSIONS.appointment.view,
+  permission: PERMISSIONS.task.view,
   matchNested: true,
 }
 ```
 
-Users without `APPOINTMENT_VIEW` never see the link.
+Users without `TASK_VIEW` never see the link.
 
 ---
 
 ## Step 10 — Tests
 
-Test only what is specific to Appointment. Listing, pagination, filtering,
+Test only what is specific to Task. Listing, pagination, filtering,
 delete confirmation, permission gating and form error mapping are already
 covered by the framework tests.
 
 ```ts
-describe("appointment adapter", () => {
-  it("flattens the patient and provider relations", () => {
+describe("task adapter", () => {
+  it("flattens the requester and assignee relations", () => {
     /* … */
   });
 });
 
-describe("AppointmentForm", () => {
+describe("TaskForm", () => {
   it("derives the end time from start plus duration", () => {
     /* … */
   });

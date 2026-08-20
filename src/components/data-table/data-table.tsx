@@ -93,7 +93,7 @@ export interface DataTableProps<TData> {
   onRetry?: () => void;
 
   // --- Presentation ---
-  /** Used in default empty and error copy, e.g. "providers". */
+  /** Used in default empty and error copy, e.g. "users". */
   entityName?: string;
   emptyState?: ReactNode;
   /** Stable row identity. Required for selection to survive refetches. */

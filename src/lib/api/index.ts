@@ -20,6 +20,24 @@ export {
 } from "./client-api";
 
 export {
+  ERROR_CODES,
+  MAX_PAGE_SIZE,
+  DEFAULT_PAGE_SIZE,
+  FIRST_PAGE,
+  TERMINAL_AUTH_CODES,
+  isTerminalAuthCode,
+  isApiFailure,
+  isApiPaginated,
+  type ApiSuccess,
+  type ApiPaginated,
+  type ApiFailure,
+  type ApiResponse,
+  type PaginationMeta,
+  type FieldError,
+  type ErrorCode,
+} from "./contract";
+
+export {
   downloadFile,
   saveBlob,
   timestampedFilename,

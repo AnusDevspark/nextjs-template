@@ -87,7 +87,7 @@ describe("toQueryParams", () => {
   });
 
   it("keeps array values with entries", () => {
-    expect(toQueryParams({ specialty: ["A", "B"] })).toEqual({ specialty: ["A", "B"] });
+    expect(toQueryParams({ tag: ["A", "B"] })).toEqual({ tag: ["A", "B"] });
   });
 });
 

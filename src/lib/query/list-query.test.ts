@@ -46,7 +46,10 @@ describe("parseListQuery", () => {
     const query = parseListQuery(new URLSearchParams("page=-5&pageSize=99999"));
 
     expect(query.page).toBe(1);
-    expect(query.pageSize).toBe(200);
+    // The API's hard cap. It answers a 400 rather than clamping, so anything
+    // larger reaching it would surface as a validation error on a page the user
+    // has no way to fix.
+    expect(query.pageSize).toBe(100);
   });
 
   it("falls back to defaults for non-numeric pagination", () => {
@@ -77,12 +80,12 @@ describe("parseListQuery", () => {
   });
 
   it("collects repeated params for multi-value keys", () => {
-    const query = parseListQuery(new URLSearchParams("specialty=A&specialty=B"), {
-      filterKeys: ["specialty"],
-      multiValueKeys: ["specialty"],
+    const query = parseListQuery(new URLSearchParams("tag=A&tag=B"), {
+      filterKeys: ["tag"],
+      multiValueKeys: ["tag"],
     });
 
-    expect(query.specialty).toEqual(["A", "B"]);
+    expect(query.tag).toEqual(["A", "B"]);
   });
 
   it("accepts the plain object shape a Server Component receives", () => {
@@ -125,10 +128,10 @@ describe("serializeListQuery", () => {
     const params = serializeListQuery({
       page: 1,
       pageSize: 20,
-      specialty: ["A", "B"],
+      tag: ["A", "B"],
     });
 
-    expect(params.getAll("specialty")).toEqual(["A", "B"]);
+    expect(params.getAll("tag")).toEqual(["A", "B"]);
   });
 
   it("round-trips through parse without drift", () => {

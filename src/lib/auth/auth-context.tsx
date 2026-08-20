@@ -158,7 +158,7 @@ export function useAuth(): AuthContextValue {
 /**
  * Boolean permission check for conditional rendering.
  *
- * `usePermission(PERMISSIONS.provider.create)` reads better at a call site than
+ * `usePermission(PERMISSIONS.user.create)` reads better at a call site than
  * `useAuth().can(...)`, and it is the hook the resource framework uses.
  */
 export function usePermission(required: Permission | Permission[] | undefined | null): boolean {

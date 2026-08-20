@@ -19,7 +19,14 @@ export default async function LoginPage() {
     <div className="flex min-h-svh items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Sign in</CardTitle>
+          {/*
+            A real <h1> inside the title: CardTitle renders a plain <div>, which
+            would leave this page with no heading at all — nothing for a screen
+            reader to navigate by, on the one page every visitor sees.
+          */}
+          <CardTitle className="text-xl">
+            <h1>Sign in</h1>
+          </CardTitle>
           <CardDescription>Continue to {env.NEXT_PUBLIC_APP_NAME}</CardDescription>
         </CardHeader>
 

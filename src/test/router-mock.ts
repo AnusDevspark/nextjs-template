@@ -17,7 +17,7 @@ export const routerMock = {
   prefetch: vi.fn(),
 };
 
-let pathname = "/providers";
+let pathname = "/users";
 let searchParams = new URLSearchParams();
 
 export function setPathname(next: string): void {
@@ -44,7 +44,7 @@ export function resetRouterMock(): void {
   routerMock.forward.mockReset();
   routerMock.prefetch.mockReset();
 
-  pathname = "/providers";
+  pathname = "/users";
   searchParams = new URLSearchParams();
 }
 

@@ -155,8 +155,8 @@ function ComboboxControl({
 /**
  * Form field backed by an API-paginated lookup.
  *
- * Feature-level selects (`FacilitySelect`, `ProviderSelect`) are built by
- * partially applying this — see `src/features/facility/components/facility-select.tsx`.
+ * Feature-level selects (a `UserSelect`, say) are built by
+ * partially applying this — put one in `src/features/<name>/components/`.
  */
 export interface FormAsyncComboboxProps<
   TFieldValues extends FieldValues,

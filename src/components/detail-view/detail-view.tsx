@@ -33,7 +33,7 @@ export interface DetailSection<TEntity> {
   description?: string;
   fields: DetailField<TEntity>[];
   columns?: 1 | 2 | 3;
-  /** Hides the whole section, e.g. an "Address" block for a remote facility. */
+  /** Hides the whole section, e.g. an "Address" block for a remote site. */
   visible?: (entity: TEntity) => boolean;
   /** Replaces the generated field grid for this section only. */
   render?: (entity: TEntity) => ReactNode;

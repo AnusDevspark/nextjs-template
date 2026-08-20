@@ -147,7 +147,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * `const ok = await confirm({ title: "Delete provider?", destructive: true })`
+ * `const ok = await confirm({ title: "Delete user?", destructive: true })`
  *
  * Reads top-to-bottom at the call site, which is why the resource framework
  * uses it for delete and for custom actions that declare `confirm`.

@@ -4,98 +4,71 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 
 import { PERMISSIONS } from "@/constants/permissions";
-import { departmentResource } from "@/features/department/department.resource";
-import type { Department } from "@/features/department";
-import { API_URL } from "@/test/msw/handlers";
+import { userResource } from "@/features/user/user.resource";
+import { API_URL, makeUser, successEnvelope } from "@/test/msw/handlers";
 import { server } from "@/test/msw/server";
 import { routerMock } from "@/test/router-mock";
 import { renderWithProviders } from "@/test/utils";
 
 import { ResourceEditPage } from "./resource-edit-page";
 
-const EDIT_PERMISSIONS = [PERMISSIONS.department.view, PERMISSIONS.department.edit];
-
-function makeDepartment(overrides: Partial<Department> = {}): Department {
-  return {
-    id: "d1",
-    name: "Cardiology",
-    code: "CARD",
-    facilityId: "f1",
-    facilityName: "Central Hospital",
-    headCount: 12,
-    status: "ACTIVE",
-    description: "Heart and vascular care",
-    createdAt: "2024-01-01T10:00:00.000Z",
-    updatedAt: "2024-06-01T10:00:00.000Z",
-    ...overrides,
-  };
-}
-
-/** The department form resolves its facility lookup label on mount. */
-function facilityLookupHandler() {
-  return http.get(`${API_URL}/facilities/:id`, () =>
-    HttpResponse.json({
-      data: {
-        id: "f1",
-        name: "Central Hospital",
-        code: "CH-01",
-        type: "HOSPITAL",
-        status: "OPERATIONAL",
-        addressLine1: "1 Main St",
-        addressLine2: null,
-        city: "Springfield",
-        state: "IL",
-        postalCode: "62701",
-        country: "United States",
-        phone: null,
-        email: null,
-        bedCount: 200,
-        departmentCount: 5,
-        providerCount: 40,
-        openedOn: "2000-01-01",
-        createdAt: "2000-01-01T00:00:00.000Z",
-        updatedAt: "2024-01-01T00:00:00.000Z",
-      },
-    }),
-  );
-}
+const EDIT_PERMISSIONS = [PERMISSIONS.user.view, PERMISSIONS.user.edit];
 
 /**
  * Tests for the edit engine.
  *
  * These cover the mechanics no feature should ever reimplement: loading the
  * record, the 404 case, mapping backend field errors onto inputs, and the
- * success path. Department is used because its form is configuration-driven, so
- * these also prove form Mode 1 renders and submits correctly.
+ * success path. The User resource is used because its form is
+ * configuration-driven, so these also prove form Mode 1 renders and submits.
+ *
+ * Every stub below returns the real envelope — `{ success, data }` for reads,
+ * `{ success, message, code, errors }` for failures. A test that stubbed a bare
+ * object would pass while the app broke against the actual API.
  */
 describe("ResourceEditPage", () => {
   it("loads the record and prefills the form", async () => {
     server.use(
-      http.get(`${API_URL}/departments/:id`, () => HttpResponse.json(makeDepartment())),
-      facilityLookupHandler(),
+      http.get(`${API_URL}/users/:id`, () => HttpResponse.json(successEnvelope(makeUser()))),
     );
 
-    renderWithProviders(<ResourceEditPage resource={departmentResource} id="d1" />, {
+    renderWithProviders(<ResourceEditPage resource={userResource} id="u1" />, {
       permissions: EDIT_PERMISSIONS,
     });
 
-    expect(await screen.findByDisplayValue("Cardiology")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("CARD")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Heart and vascular care")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("Ada")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Lovelace")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("ada@example.com")).toBeInTheDocument();
 
     // The heading is titled with the record, via `getLabel`.
-    expect(screen.getByRole("heading", { name: /edit cardiology/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /edit ada lovelace/i })).toBeInTheDocument();
+  });
+
+  it("does not render a password field when editing", async () => {
+    server.use(
+      http.get(`${API_URL}/users/:id`, () => HttpResponse.json(successEnvelope(makeUser()))),
+    );
+
+    renderWithProviders(<ResourceEditPage resource={userResource} id="u1" />, {
+      permissions: EDIT_PERMISSIONS,
+    });
+
+    await screen.findByDisplayValue("Ada");
+
+    // The API's update schema has no password field; offering one would submit
+    // a value that gets silently stripped.
+    expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
   });
 
   it("shows a form skeleton while loading", () => {
     server.use(
-      http.get(`${API_URL}/departments/:id`, async () => {
+      http.get(`${API_URL}/users/:id`, async () => {
         await new Promise((resolve) => setTimeout(resolve, 200));
-        return HttpResponse.json(makeDepartment());
+        return HttpResponse.json(successEnvelope(makeUser()));
       }),
     );
 
-    renderWithProviders(<ResourceEditPage resource={departmentResource} id="d1" />, {
+    renderWithProviders(<ResourceEditPage resource={userResource} id="u1" />, {
       permissions: EDIT_PERMISSIONS,
     });
 
@@ -104,29 +77,35 @@ describe("ResourceEditPage", () => {
 
   it("shows a not-found state for a 404, with no retry offered", async () => {
     server.use(
-      http.get(`${API_URL}/departments/:id`, () =>
-        HttpResponse.json({ message: "Not found" }, { status: 404 }),
+      http.get(`${API_URL}/users/:id`, () =>
+        HttpResponse.json(
+          { success: false, message: "User not found", code: "NOT_FOUND" },
+          { status: 404 },
+        ),
       ),
     );
 
-    renderWithProviders(<ResourceEditPage resource={departmentResource} id="missing" />, {
+    renderWithProviders(<ResourceEditPage resource={userResource} id="missing" />, {
       permissions: EDIT_PERMISSIONS,
     });
 
-    expect(await screen.findByText(/department not found/i)).toBeInTheDocument();
+    expect(await screen.findByText(/user not found/i)).toBeInTheDocument();
     // Retrying a deleted record would never succeed, so no retry button.
     expect(screen.queryByRole("button", { name: /try again/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /back to departments/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /back to users/i })).toBeInTheDocument();
   });
 
   it("offers a retry for a transient server error", async () => {
     server.use(
-      http.get(`${API_URL}/departments/:id`, () =>
-        HttpResponse.json({ message: "boom" }, { status: 500 }),
+      http.get(`${API_URL}/users/:id`, () =>
+        HttpResponse.json(
+          { success: false, message: "Internal server error", code: "INTERNAL_ERROR" },
+          { status: 500 },
+        ),
       ),
     );
 
-    renderWithProviders(<ResourceEditPage resource={departmentResource} id="d1" />, {
+    renderWithProviders(<ResourceEditPage resource={userResource} id="u1" />, {
       permissions: EDIT_PERMISSIONS,
     });
 
@@ -135,12 +114,11 @@ describe("ResourceEditPage", () => {
 
   it("blocks the page without the edit permission", async () => {
     server.use(
-      http.get(`${API_URL}/departments/:id`, () => HttpResponse.json(makeDepartment())),
-      facilityLookupHandler(),
+      http.get(`${API_URL}/users/:id`, () => HttpResponse.json(successEnvelope(makeUser()))),
     );
 
-    renderWithProviders(<ResourceEditPage resource={departmentResource} id="d1" />, {
-      permissions: [PERMISSIONS.department.view],
+    renderWithProviders(<ResourceEditPage resource={userResource} id="u1" />, {
+      permissions: [PERMISSIONS.user.view],
     });
 
     expect(await screen.findByText(/you do not have access/i)).toBeInTheDocument();
@@ -150,87 +128,99 @@ describe("ResourceEditPage", () => {
     const user = userEvent.setup();
 
     server.use(
-      http.get(`${API_URL}/departments/:id`, () => HttpResponse.json(makeDepartment())),
-      facilityLookupHandler(),
-      http.put(`${API_URL}/departments/:id`, () =>
+      http.get(`${API_URL}/users/:id`, () => HttpResponse.json(successEnvelope(makeUser()))),
+      // PATCH, not PUT — the API has no PUT routes.
+      http.patch(`${API_URL}/users/:id`, () =>
         HttpResponse.json(
           {
-            code: "DEPARTMENT_CODE_EXISTS",
-            message: "Validation failed",
-            errors: [{ path: "code", message: "This code is already in use" }],
+            success: false,
+            code: "CONFLICT",
+            message: "A user with this email already exists",
+            // The API names the key `field`; `parse-api-error` accepts it
+            // alongside `path`.
+            errors: [{ field: "email", message: "This email is already in use" }],
           },
           { status: 409 },
         ),
       ),
     );
 
-    renderWithProviders(<ResourceEditPage resource={departmentResource} id="d1" />, {
+    renderWithProviders(<ResourceEditPage resource={userResource} id="u1" />, {
       permissions: EDIT_PERMISSIONS,
     });
 
-    await screen.findByDisplayValue("Cardiology");
+    await screen.findByDisplayValue("Ada");
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     // The message lands next to the input, not in a toast.
-    expect(await screen.findByText("This code is already in use")).toBeInTheDocument();
+    expect(await screen.findByText("This email is already in use")).toBeInTheDocument();
 
-    const codeInput = screen.getByDisplayValue("CARD");
-    expect(codeInput).toHaveAttribute("aria-invalid", "true");
+    const emailInput = screen.getByDisplayValue("ada@example.com");
+    expect(emailInput).toHaveAttribute("aria-invalid", "true");
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 
-  it("submits changes and navigates to the detail page on success", async () => {
+  it("submits changes with PATCH and navigates to the detail page on success", async () => {
     const user = userEvent.setup();
     let submitted: unknown;
+    let method: string | undefined;
 
     server.use(
-      http.get(`${API_URL}/departments/:id`, () => HttpResponse.json(makeDepartment())),
-      facilityLookupHandler(),
-      http.put(`${API_URL}/departments/:id`, async ({ request }) => {
+      http.get(`${API_URL}/users/:id`, () => HttpResponse.json(successEnvelope(makeUser()))),
+      http.patch(`${API_URL}/users/:id`, async ({ request }) => {
         submitted = await request.json();
-        return HttpResponse.json(makeDepartment({ name: "Cardiac Care" }));
+        method = request.method;
+        return HttpResponse.json(successEnvelope(makeUser({ firstName: "Augusta" })));
       }),
     );
 
-    renderWithProviders(<ResourceEditPage resource={departmentResource} id="d1" />, {
+    renderWithProviders(<ResourceEditPage resource={userResource} id="u1" />, {
       permissions: EDIT_PERMISSIONS,
     });
 
-    const nameInput = await screen.findByDisplayValue("Cardiology");
-    await user.clear(nameInput);
-    await user.type(nameInput, "Cardiac Care");
+    const firstNameInput = await screen.findByDisplayValue("Ada");
+    await user.clear(firstNameInput);
+    await user.type(firstNameInput, "Augusta");
 
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
-    await waitFor(() => expect(submitted).toMatchObject({ name: "Cardiac Care", code: "CARD" }));
-    await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith("/departments/d1"));
+    await waitFor(() =>
+      expect(submitted).toMatchObject({ firstName: "Augusta", email: "ada@example.com" }),
+    );
+    expect(method).toBe("PATCH");
+    // Never sent: the update schema does not accept it.
+    expect(submitted).not.toHaveProperty("password");
+
+    await waitFor(() =>
+      expect(routerMock.push).toHaveBeenCalledWith(
+        "/users/11111111-1111-4111-8111-111111111111",
+      ),
+    );
   });
 
   it("blocks submission on client-side validation before calling the API", async () => {
     const user = userEvent.setup();
-    let putCalled = false;
+    let patchCalled = false;
 
     server.use(
-      http.get(`${API_URL}/departments/:id`, () => HttpResponse.json(makeDepartment())),
-      facilityLookupHandler(),
-      http.put(`${API_URL}/departments/:id`, () => {
-        putCalled = true;
-        return HttpResponse.json(makeDepartment());
+      http.get(`${API_URL}/users/:id`, () => HttpResponse.json(successEnvelope(makeUser()))),
+      http.patch(`${API_URL}/users/:id`, () => {
+        patchCalled = true;
+        return HttpResponse.json(successEnvelope(makeUser()));
       }),
     );
 
-    renderWithProviders(<ResourceEditPage resource={departmentResource} id="d1" />, {
+    renderWithProviders(<ResourceEditPage resource={userResource} id="u1" />, {
       permissions: EDIT_PERMISSIONS,
     });
 
-    // "cardiology" in lower case violates the uppercase code pattern.
-    const codeInput = await screen.findByDisplayValue("CARD");
-    await user.clear(codeInput);
-    await user.type(codeInput, "lower");
+    const emailInput = await screen.findByDisplayValue("ada@example.com");
+    await user.clear(emailInput);
+    await user.type(emailInput, "not-an-email");
 
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
-    expect(await screen.findByText(/use 2–10 uppercase letters/i)).toBeInTheDocument();
-    expect(putCalled).toBe(false);
+    expect(await screen.findByText(/enter a valid email address/i)).toBeInTheDocument();
+    expect(patchCalled).toBe(false);
   });
 });

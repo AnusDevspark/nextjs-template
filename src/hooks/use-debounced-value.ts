@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 /**
  * Returns `value` after it has stopped changing for `delay` ms.
  *
- * Used by search inputs and async comboboxes so typing "cardiology" fires one
+ * Used by search inputs and async comboboxes so typing a search term fires one
  * request instead of eleven.
  */
 export function useDebouncedValue<T>(value: T, delay = 300): T {

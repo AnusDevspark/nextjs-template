@@ -1,79 +1,75 @@
 import { http, HttpResponse } from "msw";
 
-import type { Provider } from "@/features/provider";
+import type { User } from "@/features/user";
+import type { ApiPaginated, ApiSuccess, PaginationMeta } from "@/lib/api/contract";
 
 /**
  * Default MSW handlers.
  *
  * These exist for tests only — the app itself always talks to the real Node
- * API. They reproduce the *envelope* each backend actually uses, so the adapter
- * tests prove the real normalization logic rather than a convenient fiction.
+ * API. They reproduce the *exact* envelope the backend sends, so adapter tests
+ * prove the real normalization logic rather than a convenient fiction. If you
+ * change a shape here and the tests still pass, the shape was not being
+ * asserted; see `src/lib/api/contract.test.ts`.
  */
 
 export const API_URL = "http://localhost:4000/api/v1";
 
-export function makeProvider(overrides: Partial<Provider> = {}): Provider {
+export function makeUser(overrides: Partial<User> = {}): User {
   return {
-    id: "p1",
+    id: "11111111-1111-4111-8111-111111111111",
     firstName: "Ada",
     lastName: "Lovelace",
+    fullName: "Ada Lovelace",
     email: "ada@example.com",
-    phone: "5551234567",
-    npi: "1234567890",
-    specialty: "CARDIOLOGY",
-    credentials: ["MD"],
     status: "ACTIVE",
-    facilityId: "f1",
-    facilityName: "Central Hospital",
-    acceptingNewPatients: true,
-    startDate: "2024-03-01",
-    notes: null,
-    createdAt: "2024-01-01T10:00:00.000Z",
-    updatedAt: "2024-06-01T10:00:00.000Z",
+    role: "ADMIN",
+    createdAt: "2026-01-01T10:00:00.000Z",
+    updatedAt: "2026-06-01T10:00:00.000Z",
     ...overrides,
   };
 }
 
-/** The Provider service's double envelope, as a raw DTO list. */
-export function providerListEnvelope(providers: Provider[], total = providers.length) {
+/** `{ success, data, meta }` — the list envelope, with all six meta keys. */
+export function paginatedEnvelope<T>(
+  items: T[],
+  meta: Partial<PaginationMeta> = {},
+): ApiPaginated<T> {
+  const page = meta.page ?? 1;
+  const pageSize = meta.pageSize ?? 20;
+  const total = meta.total ?? items.length;
+  const totalPages = meta.totalPages ?? Math.max(1, Math.ceil(total / pageSize));
+
   return {
-    responseData: {
-      message: {
-        items: providers.map((provider) => ({
-          ...provider,
-          credentials: provider.credentials.join(","),
-          facility: provider.facilityId
-            ? { id: provider.facilityId, name: provider.facilityName }
-            : null,
-        })),
-        total,
-      },
+    success: true,
+    data: items,
+    meta: {
+      page,
+      pageSize,
+      total,
+      totalPages,
+      hasNextPage: meta.hasNextPage ?? page < totalPages,
+      hasPreviousPage: meta.hasPreviousPage ?? page > 1,
     },
   };
 }
 
-export function providerDetailEnvelope(provider: Provider) {
-  return {
-    responseData: {
-      message: {
-        ...provider,
-        credentials: provider.credentials.join(","),
-        facility: provider.facilityId
-          ? { id: provider.facilityId, name: provider.facilityName }
-          : null,
-      },
-    },
-  };
+/**
+ * `{ success, data }` — the single-resource envelope.
+ *
+ * `message` is omitted rather than set to null, which is what the API does when
+ * an endpoint has nothing to say.
+ */
+export function successEnvelope<T>(data: T, message?: string): ApiSuccess<T> {
+  return message === undefined ? { success: true, data } : { success: true, message, data };
 }
 
 export const handlers = [
   http.get("/api/auth/session", () => HttpResponse.json({ user: null, accessToken: null })),
 
-  http.get(`${API_URL}/providers`, () =>
-    HttpResponse.json(providerListEnvelope([makeProvider()], 1)),
-  ),
+  http.get(`${API_URL}/users`, () => HttpResponse.json(paginatedEnvelope([makeUser()]))),
 
-  http.get(`${API_URL}/providers/:id`, ({ params }) =>
-    HttpResponse.json(providerDetailEnvelope(makeProvider({ id: String(params.id) }))),
+  http.get(`${API_URL}/users/:id`, ({ params }) =>
+    HttpResponse.json(successEnvelope(makeUser({ id: String(params.id) }))),
   ),
 ];

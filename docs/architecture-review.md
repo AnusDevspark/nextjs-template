@@ -10,11 +10,11 @@ design questions.
 ### Before
 
 ```
-Provider    listing, pagination, filters, search, sorting, actions,
+Invoice    listing, pagination, filters, search, sorting, actions,
             loading, errors, form page, edit page, details, delete
             modal, permissions
-Facility    all of it again
-Department  all of it again
+Team    all of it again
+User  all of it again
 …15 more modules
 ```
 
@@ -38,23 +38,23 @@ Features supply only their differences.
 | `components/` (data-table, forms, detail-view, common) |     4,489 | Level 2 building blocks                                      |
 | `lib/` + `hooks/`                                      |     1,946 | API client, errors, auth, permissions, query, formatters     |
 | **Shared total**                                       | **8,665** |                                                              |
-| Provider (rich)                                        |     1,016 | Custom form, custom cells, business action, export           |
-| Facility (different)                                   |       942 | Different envelope, nested address, custom detail + filter   |
-| Department (simple)                                    |       334 | Configuration and schema only                                |
+| Invoice (rich)                                        |     1,016 | Custom form, custom cells, business action, export           |
+| Team (different)                                   |       942 | Different envelope, nested address, custom detail + filter   |
+| User (simple)                                    |       334 | Configuration and schema only                                |
 | Routes (12 files)                                      |       186 | 3–8 lines each                                               |
 | **Feature total**                                      | **2,478** |                                                              |
 
 **78% shared / 22% feature-specific** across three modules — and the ratio
 improves with every additional simple module, because the shared half is fixed.
 
-Department in full:
+User in full:
 
 ```
-department.resource.ts   123   ← definition, form fields, detail sections
-department.columns.tsx    64   ← all helper-built
-department.api.ts         55   ← adapter, no DTO mapper needed
-department.types.ts       49
-department.schema.ts      25
+user.resource.ts   123   ← definition, form fields, detail sections
+user.columns.tsx    64   ← all helper-built
+user.api.ts         55   ← adapter, no DTO mapper needed
+user.types.ts       49
+user.schema.ts      25
 index.ts                  18
 ─────────────────────────────
                          334   + 62 lines of routes
@@ -93,11 +93,11 @@ Every repeated pattern, and the decision made about it.
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | Column definitions   | Presentation is the business logic. A generator would need a template language                                                          |
 | Status → colour maps | `ACTIVE` means different things per module. One global map forces one meaning                                                           |
-| DTO mappers          | Only two of three features need one. Department having none is the point                                                                |
-| Form layouts         | Provider's sectioned form and Department's grid are genuinely different problems                                                        |
-| Detail layouts       | Facility wants stat cards; Provider wants field grids                                                                                   |
-| Business actions     | `deactivateProvider` is Provider's, and belongs in Provider                                                                             |
-| Feature lookups      | `FacilitySelect` is 15 lines over `AsyncCombobox`. Sharing them into `shared/selects/` would create a folder that imports every feature |
+| DTO mappers          | Only two of three features need one. User having none is the point                                                                |
+| Form layouts         | Invoice's sectioned form and User's grid are genuinely different problems                                                        |
+| Detail layouts       | Team wants stat cards; Invoice wants field grids                                                                                   |
+| Business actions     | `suspendUser` is Invoice's, and belongs in Invoice                                                                             |
+| Feature lookups      | `CustomerSelect` is 15 lines over `AsyncCombobox`. Sharing them into `shared/selects/` would create a folder that imports every feature |
 
 ### Acceptable duplication
 
@@ -206,7 +206,7 @@ error mapping, toasts, invalidation and navigation while you own the layout.
 Tabs, timelines, embedded child tables, aggregates and charts, layout-driven
 views (floor plans, calendars). A practical trigger: when more than about a
 third of your fields already use `render`, the configuration is JSX with extra
-steps — switch to `details.component`. Facility does exactly this.
+steps — switch to `details.component`. Team does exactly this.
 
 ### 8. When should I use resource configuration versus normal JSX?
 
@@ -226,8 +226,8 @@ including one with zero-indexed pages. When a backend changes, one file changes.
 
 ### 10. How should resource-specific business actions be implemented?
 
-As plain exported functions in the feature's API module — `deactivateProvider`,
-`cancelAppointment` — wired through `actions.custom`. They get permission
+As plain exported functions in the feature's API module — `suspendUser`,
+`cancelTask` — wired through `actions.custom`. They get permission
 filtering, confirmation, pending state, error toasting and refresh from the
 framework. Do **not** force them into `ResourceApi`; that contract is about CRUD,
 and stretching it to cover business verbs is how a clean interface rots.

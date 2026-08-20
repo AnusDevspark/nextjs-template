@@ -5,7 +5,7 @@ export type SortOrder = "asc" | "desc";
  *
  * Features extend it rather than redefining it:
  *
- *   type ProviderListQuery = BaseListQuery & { status?: string; specialty?: string };
+ *   type UserListQuery = BaseListQuery & { status?: string; role?: string };
  */
 export interface BaseListQuery {
   page: number;
@@ -39,6 +39,16 @@ export interface ListQueryConfig {
 
 export const DEFAULT_PAGE_SIZE = 20;
 export const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
+
+/**
+ * Must not exceed the backend's own cap.
+ *
+ * The API rejects an oversized `pageSize` with a 400 rather than clamping it,
+ * so a hand-edited `?pageSize=500` would surface as a validation error on a
+ * page the user cannot fix. Clamping here turns that into a silently sensible
+ * request. Mirrors MAX_PAGE_SIZE in `@/lib/api/contract`.
+ */
+const MAX_PAGE_SIZE = 100;
 
 /** Reserved names, so a filter cannot accidentally shadow pagination. */
 export const RESERVED_QUERY_KEYS = ["page", "pageSize", "search", "sortBy", "sortOrder"] as const;
@@ -78,7 +88,7 @@ export function parseListQuery(params: SearchParamsInput, config: ListQueryConfi
   } = config;
 
   const page = clampInt(readParam(params, "page"), 1, 1, 100_000);
-  const pageSize = clampInt(readParam(params, "pageSize"), defaultPageSize, 1, 200);
+  const pageSize = clampInt(readParam(params, "pageSize"), defaultPageSize, 1, MAX_PAGE_SIZE);
 
   const search = readParam(params, "search")?.trim() || undefined;
 

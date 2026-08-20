@@ -101,7 +101,7 @@ export function formatBoolean(
   return value ? yes : no;
 }
 
-/** `["Cardiology", "Neurology"]` → `Cardiology, Neurology` */
+/** `["Editor", "Reviewer"]` → `Editor, Reviewer` */
 export function formatList(
   value: readonly string[] | null | undefined,
   {

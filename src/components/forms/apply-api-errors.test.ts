@@ -65,7 +65,7 @@ describe("applyApiErrorsToForm", () => {
         message: "Validation failed",
         errors: [
           { path: "email", message: "Taken" },
-          { path: "npi", message: "Too short" },
+          { path: "code", message: "Too short" },
         ],
       }),
       form,
@@ -100,7 +100,7 @@ describe("applyApiErrorsToForm", () => {
         errors: [{ path: "internalRiskScore", message: "Out of range" }],
       }),
       form,
-      { knownFields: ["email", "npi"] },
+      { knownFields: ["email", "code"] },
     );
 
     // Attaching this to a hidden field would block submission with an error the

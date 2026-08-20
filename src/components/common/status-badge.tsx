@@ -24,7 +24,7 @@ const TONE_CLASSES: Record<StatusTone, string> = {
 /**
  * A status → tone (and optional label) mapping owned by a feature.
  *
- *   export const providerStatusMap = {
+ *   export const userStatusMap = {
  *     ACTIVE:   { tone: "success", label: "Active" },
  *     INACTIVE: { tone: "muted" },
  *   } satisfies StatusMap<ProviderStatus>;

@@ -1,10 +1,4 @@
-import {
-  Building2Icon,
-  LayoutDashboardIcon,
-  NetworkIcon,
-  StethoscopeIcon,
-  type LucideIcon,
-} from "lucide-react";
+import { LayoutDashboardIcon, UsersIcon, type LucideIcon } from "lucide-react";
 
 import { PERMISSIONS, type Permission } from "@/constants/permissions";
 
@@ -24,7 +18,7 @@ export interface NavItem {
   href: string;
   icon: LucideIcon;
   permission?: Permission;
-  /** Matches nested routes too, e.g. `/providers/123/edit`. */
+  /** Matches nested routes too, e.g. `/users/123/edit`. */
   matchNested?: boolean;
 }
 
@@ -44,27 +38,13 @@ export const navigation: NavGroup[] = [
     ],
   },
   {
-    title: "Directory",
+    title: "Administration",
     items: [
       {
-        title: "Providers",
-        href: "/providers",
-        icon: StethoscopeIcon,
-        permission: PERMISSIONS.provider.view,
-        matchNested: true,
-      },
-      {
-        title: "Facilities",
-        href: "/facilities",
-        icon: Building2Icon,
-        permission: PERMISSIONS.facility.view,
-        matchNested: true,
-      },
-      {
-        title: "Departments",
-        href: "/departments",
-        icon: NetworkIcon,
-        permission: PERMISSIONS.department.view,
+        title: "Users",
+        href: "/users",
+        icon: UsersIcon,
+        permission: PERMISSIONS.user.view,
         matchNested: true,
       },
     ],

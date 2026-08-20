@@ -5,22 +5,26 @@ import { expect, test } from "@playwright/test";
  *
  * They verify the parts of the app that are entirely the frontend's
  * responsibility: request-time redirects, the login screen, and client-side
- * validation. Anything requiring real data lives in `providers.api.spec.ts`.
+ * validation. Anything requiring real data lives in `users.api.spec.ts`.
  */
 test.describe("authentication routing", () => {
+  // These are all about what an anonymous visitor sees, so they must discard
+  // the shared signed-in session the other API specs run with.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test("redirects an anonymous visitor to the login page", async ({ page }) => {
-    await page.goto("/providers");
+    await page.goto("/users");
 
     await expect(page).toHaveURL(/\/login/);
     await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
   });
 
   test("preserves the requested path so login can return there", async ({ page }) => {
-    await page.goto("/facilities?status=OPERATIONAL");
+    await page.goto("/users?status=SUSPENDED");
 
     // `proxy.ts` puts the destination in `next`.
     await expect(page).toHaveURL(/next=/);
-    expect(decodeURIComponent(page.url())).toContain("/facilities?status=OPERATIONAL");
+    expect(decodeURIComponent(page.url())).toContain("/users?status=SUSPENDED");
   });
 
   test("shows client-side validation before any request is made", async ({ page }) => {
@@ -44,7 +48,11 @@ test.describe("authentication routing", () => {
   });
 
   test("renders the not-found page for an unknown route", async ({ page }) => {
-    await page.goto("/this-route-does-not-exist");
+    // Under a public prefix on purpose. `proxy.ts` redirects an anonymous
+    // visitor away from *any* non-public path before rendering can happen, so
+    // an unauthenticated request to a random URL lands on /login, not here —
+    // the 404 page is only reachable where the proxy stands aside.
+    await page.goto("/login/this-route-does-not-exist");
 
     await expect(page.getByText(/page not found/i)).toBeVisible();
   });

@@ -219,7 +219,7 @@ export type ResourceFormField<TFormValues extends FieldValues> =
       visible?: (values: TFormValues) => boolean;
     }
   | {
-      /** An API-backed lookup, e.g. "Facility". */
+      /** An API-backed lookup, e.g. "Owner". */
       type: "async-combobox";
       name: Path<TFormValues>;
       label: string;
@@ -290,6 +290,16 @@ export interface ResourceFormConfig<
 
   /** Mode 1: declarative fields. */
   fields?: ResourceFormField<TFormValues>[];
+  /**
+   * Overrides `fields` for one mode, mirroring `createSchema`/`editSchema`.
+   *
+   * For the common case where the two forms differ by a field or two, `visible`
+   * on a single field list is simpler — but `visible` only sees form values, so
+   * it cannot express "only when creating". A create-only password is the
+   * canonical example.
+   */
+  createFields?: ResourceFormField<TFormValues>[];
+  editFields?: ResourceFormField<TFormValues>[];
 
   /** Mode 2: a custom component. Takes precedence over `fields`. */
   component?: ComponentType<ResourceFormProps<TEntity, TFormValues>>;
@@ -376,7 +386,7 @@ export interface ResourceActionsConfig<TEntity> {
 // --- Export ----------------------------------------------------------------
 
 export interface ResourceExportConfig<TQuery extends BaseListQuery> {
-  /** Path passed to `downloadFile`, e.g. `/providers/export`. */
+  /** Path passed to `downloadFile`, e.g. `/users/export`. */
   path: string;
   formats?: Array<"csv" | "xlsx" | "pdf">;
   /** Extra query params beyond the current list query. */
@@ -393,7 +403,7 @@ export interface ResourceDefinition<
   TQuery extends BaseListQuery = ListQuery,
   TFormValues extends FieldValues = FieldValues,
 > {
-  /** Cache namespace and URL-safe identifier, e.g. `"provider"`. */
+  /** Cache namespace and URL-safe identifier, e.g. `"user"`. */
   key: string;
   name: string;
   pluralName: string;

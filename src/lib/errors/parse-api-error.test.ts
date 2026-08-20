@@ -22,8 +22,8 @@ describe("parseApiError", () => {
       jsonResponse(
         {
           success: false,
-          code: "PROVIDER_EMAIL_EXISTS",
-          message: "Provider already exists",
+          code: "USER_EMAIL_EXISTS",
+          message: "User already exists",
           errors: [{ path: "email", message: "Email already exists" }],
         },
         { status: 409 },
@@ -31,8 +31,8 @@ describe("parseApiError", () => {
     );
 
     expect(error.status).toBe(409);
-    expect(error.code).toBe("PROVIDER_EMAIL_EXISTS");
-    expect(error.message).toBe("Provider already exists");
+    expect(error.code).toBe("USER_EMAIL_EXISTS");
+    expect(error.message).toBe("User already exists");
     expect(error.errors).toEqual([
       { path: "email", message: "Email already exists", code: undefined },
     ]);
@@ -42,25 +42,25 @@ describe("parseApiError", () => {
   it("accepts `field` instead of `path`", async () => {
     const error = await parseApiError(
       jsonResponse(
-        { message: "Invalid", errors: [{ field: "npi", message: "Too short" }] },
+        { message: "Invalid", errors: [{ field: "code", message: "Too short" }] },
         { status: 422 },
       ),
     );
 
-    expect(error.errors).toEqual([{ path: "npi", message: "Too short", code: undefined }]);
+    expect(error.errors).toEqual([{ path: "code", message: "Too short", code: undefined }]);
   });
 
   it("accepts a map of field to message", async () => {
     const error = await parseApiError(
       jsonResponse(
-        { message: "Invalid", errors: { email: "Taken", npi: ["Too short", "Bad"] } },
+        { message: "Invalid", errors: { email: "Taken", code: ["Too short", "Bad"] } },
         { status: 422 },
       ),
     );
 
     expect(error.errors).toEqual([
       { path: "email", message: "Taken" },
-      { path: "npi", message: "Too short" },
+      { path: "code", message: "Too short" },
     ]);
   });
 
@@ -123,8 +123,8 @@ describe("error presentation", () => {
   });
 
   it("keeps a useful 4xx message", () => {
-    expect(getErrorMessage(new ApiError({ status: 409, message: "Provider already exists" }))).toBe(
-      "Provider already exists",
+    expect(getErrorMessage(new ApiError({ status: 409, message: "User already exists" }))).toBe(
+      "User already exists",
     );
   });
 

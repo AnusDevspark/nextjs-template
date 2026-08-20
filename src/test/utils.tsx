@@ -23,9 +23,15 @@ export function makeUser(overrides: Partial<SessionUser> = {}): SessionUser {
     email: "user@example.com",
     firstName: "Test",
     lastName: "User",
+    fullName: "Test User",
+    status: "ACTIVE",
     avatarUrl: null,
-    roles: ["ADMIN"],
+    // Singular: the API models one role per user. Authorization reads
+    // `permissions`, never this.
+    role: "ADMIN",
     permissions: [],
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };
 }

@@ -38,8 +38,8 @@ export function UserMenu() {
         <DropdownMenuLabel className="font-normal">
           <p className="truncate text-sm font-medium">{name}</p>
           <p className="text-muted-foreground truncate text-xs">{user.email}</p>
-          {user.roles.length > 0 ? (
-            <p className="text-muted-foreground mt-1 truncate text-xs">{user.roles.join(", ")}</p>
+          {user.role ? (
+            <p className="text-muted-foreground mt-1 truncate text-xs">{user.role}</p>
           ) : null}
         </DropdownMenuLabel>
 
