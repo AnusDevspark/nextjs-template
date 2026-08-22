@@ -38,13 +38,47 @@ export const getSession = cache(async (): Promise<Session | null> => {
 
     return { user, permissions: toPermissionSet(user.permissions) };
   } catch (error) {
-    // An expired access token is an ordinary signed-out state here: a Server
-    // Component cannot write the refreshed cookie, so the browser handles
-    // refresh via the BFF instead.
+    // An expired or rejected access token is an ordinary signed-out state. The
+    // recovery for it happens in `proxy.ts`, which spends the refresh cookie
+    // before this ever runs — a Server Component cannot write the new cookie
+    // itself.
     if (isApiError(error) && (error.isUnauthorized || error.isForbidden)) return null;
-    throw error;
+
+    /*
+     * Everything else is a broken backend, not a signed-out user, and the
+     * difference matters: returning null here would bounce a perfectly valid
+     * session to /login and hide an outage behind a login form nobody can get
+     * through. So it throws — but as one named error rather than a raw Zod
+     * issue or a bare fetch failure, because the stack that reaches the server
+     * log is otherwise a schema path with no hint that /auth/me was involved.
+     *
+     * The boundary that catches this is `app/error.tsx`: the throw happens in
+     * the dashboard *layout*, so the segment's own error file never sees it.
+     * That page offers a sign-out, which is the escape hatch for a cookie the
+     * backend can no longer resolve.
+     */
+    throw new SessionLookupError(error);
   }
 });
+
+/** A `/auth/me` failure that is not a 401 or 403 — i.e. not a logged-out user. */
+export class SessionLookupError extends Error {
+  readonly cause: unknown;
+
+  constructor(cause: unknown) {
+    super(`Could not resolve the session: GET /auth/me failed. ${describe(cause)}`);
+    this.name = "SessionLookupError";
+    this.cause = cause;
+  }
+}
+
+function describe(cause: unknown): string {
+  if (isApiError(cause)) {
+    return `Status ${cause.status}${cause.code ? ` (${cause.code})` : ""}.`;
+  }
+  if (cause instanceof Error) return cause.message;
+  return String(cause);
+}
 
 /** The session, or a redirect to `/login` carrying the current path. */
 export async function requireSession(returnTo?: string): Promise<Session> {

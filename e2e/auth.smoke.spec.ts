@@ -47,6 +47,35 @@ test.describe("authentication routing", () => {
     await expect(email).toHaveAttribute("aria-describedby", /.+/);
   });
 
+  test("an expired access cookie with a live refresh cookie does not loop", async ({
+    page,
+    context,
+  }) => {
+    /*
+     * Regression: this pair used to deadlock the app.
+     *
+     * `proxy.ts` counted a bare refresh cookie as a session and bounced the
+     * visitor off /login, while `getSession` saw no access token and bounced
+     * them back onto it — ERR_TOO_MANY_REDIRECTS, escapable only by clearing
+     * cookies by hand. The proxy no longer redirects anyone away from /login;
+     * it spends the refresh cookie instead, and drops both cookies when that
+     * fails, which is what happens here because no API is running.
+     */
+    const refreshCookie = process.env.AUTH_REFRESH_COOKIE ?? "acme_rt";
+    const origin = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+
+    await context.addCookies([
+      { name: refreshCookie, value: "stale-refresh-token", url: origin },
+    ]);
+
+    await page.goto("/login");
+
+    await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
+
+    const remaining = await context.cookies();
+    expect(remaining.map((cookie) => cookie.name)).not.toContain(refreshCookie);
+  });
+
   test("renders the not-found page for an unknown route", async ({ page }) => {
     // Under a public prefix on purpose. `proxy.ts` redirects an anonymous
     // visitor away from *any* non-public path before rendering can happen, so
