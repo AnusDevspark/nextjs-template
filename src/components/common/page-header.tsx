@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 
 import {
@@ -63,20 +63,20 @@ export function PageBreadcrumbs({ entries }: { entries: BreadcrumbEntry[] }) {
           const isLast = index === entries.length - 1;
 
           return (
-            <BreadcrumbItem key={`${entry.label}-${index}`}>
-              {isLast || !entry.href ? (
-                <BreadcrumbPage className="max-w-[16rem] truncate">{entry.label}</BreadcrumbPage>
-              ) : (
-                <>
+            <Fragment key={`${entry.label}-${index}`}>
+              <BreadcrumbItem>
+                {isLast || !entry.href ? (
+                  <BreadcrumbPage className="max-w-[16rem] truncate">{entry.label}</BreadcrumbPage>
+                ) : (
                   <BreadcrumbLink asChild>
                     <Link href={entry.href} className="max-w-[12rem] truncate">
                       {entry.label}
                     </Link>
                   </BreadcrumbLink>
-                  <BreadcrumbSeparator />
-                </>
-              )}
-            </BreadcrumbItem>
+                )}
+              </BreadcrumbItem>
+              {isLast ? null : <BreadcrumbSeparator />}
+            </Fragment>
           );
         })}
       </BreadcrumbList>
