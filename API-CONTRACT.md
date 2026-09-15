@@ -304,6 +304,91 @@ The API sets no cookies. The Next.js BFF does, on its own origin:
 
 Names come from `AUTH_ACCESS_COOKIE` / `AUTH_REFRESH_COOKIE`.
 
+### Password reset
+
+```
+POST /auth/forgot-password { email }
+  → 200 { success, message }   ← same response whether or not the account exists
+
+… user clicks the link in their email: FRONTEND_URL/reset-password?token=... …
+
+POST /auth/reset-password { token, newPassword }
+  → 200 { success, message }
+  → 401 AUTH_TOKEN_INVALID    (unknown token, wrong purpose, or already used)
+  → 401 AUTH_TOKEN_EXPIRED    (valid token, past its TTL)
+```
+
+A successful reset revokes every refresh session for the account — the client must send the
+user back through `/auth/login`, not attempt a `/auth/refresh` with an old token.
+
+### Email verification
+
+```
+POST /auth/verify-email { token }
+  → 200 { success, message }
+  → 401 AUTH_TOKEN_INVALID | AUTH_TOKEN_EXPIRED   (same codes as password reset)
+
+POST /auth/resend-verification   (authenticated, no body)
+  → 200 { success, message }
+```
+
+Registration fires a verification email automatically; login is **not** gated on
+`emailVerifiedAt` — an unverified account can sign in normally. `GET /auth/me`'s user object
+does not currently expose `emailVerifiedAt`; add it there if the frontend needs to show a
+"verify your email" banner.
+
+---
+
+## 6b. Files
+
+All three require a bearer token. There is no ownership model: any signed-in caller holding
+a key can read or delete it, and the key — a UUID plus the original extension — is what
+makes that safe in practice. Treat keys as secrets.
+
+```
+POST /files                       multipart/form-data, field name "file"
+  → 201 { success, message, data: { key, url } }
+  → 400 BAD_REQUEST     (no file in the request)
+  → 413                 (over STORAGE_MAX_UPLOAD_BYTES, 5 MB by default)
+  → 429 RATE_LIMITED    (uploads have their own budget, stricter than the general one)
+
+GET /files/{key}/signed-url
+  → 200 { success, data: { url } }
+  → 400 VALIDATION_FAILED   (key is not the expected UUID[.ext] shape)
+
+DELETE /files/{key}
+  → 204
+  → 400 VALIDATION_FAILED   (same key check)
+```
+
+`url` is a time-limited signed URL when the API runs on the `s3` driver. On the `local`
+driver it is a plain static URL with **no expiry** — development only; do not build a
+client that assumes the link eventually dies.
+
+`DELETE` is idempotent: deleting a key that is already gone still returns 204.
+
+---
+
+## 6c. Health
+
+Outside the `/api/v1` prefix, and exempt from rate limiting — probes must never be
+throttled. These are the only endpoints that do not use the standard envelope's `message`
+field on success.
+
+```
+GET /health/live    → 200 { success, data: { status: "ok", uptime } }
+                      Never touches the database. Liveness only.
+
+GET /health/ready   → 200 { success, data: { status: "ready", checks: { database } } }
+                    → 503 SERVICE_UNAVAILABLE  { data: { status: "not_ready", ... } }
+                      Checks the database. Use this for load-balancer rotation.
+
+GET /health         → 200 | 503, the same plus service, version, environment, timestamp.
+```
+
+A 503 here means "temporarily unable", not an error to page on — the instance stays up and
+rejoins on its own once the check passes.
+
 ---
 
 ## 7. Request tracing and rate limits
