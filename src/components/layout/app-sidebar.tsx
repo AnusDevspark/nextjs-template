@@ -67,7 +67,7 @@ export function AppSidebar() {
   return (
     <aside className="bg-sidebar hidden w-60 shrink-0 border-r md:flex md:flex-col">
       <div className="flex h-14 items-center border-b px-5">
-        <Link href="/admin" className="truncate text-sm font-semibold">
+        <Link href="/" className="truncate text-sm font-semibold">
           {env.NEXT_PUBLIC_APP_NAME}
         </Link>
       </div>

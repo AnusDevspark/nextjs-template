@@ -166,8 +166,6 @@ function continueWithTokens(request: NextRequest, tokens: RefreshedTokens): Next
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
-  // The storefront is public and never needs an authentication refresh.
-  if (pathname === "/") return NextResponse.next();
   const isPublic = isPublicPath(pathname);
 
   const hasAccessCookie = request.cookies.has(ACCESS_COOKIE);

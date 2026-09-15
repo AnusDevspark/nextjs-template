@@ -52,7 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </SheetContent>
           </Sheet>
 
-          <Link href="/admin" className="text-sm font-semibold md:hidden">
+          <Link href="/" className="text-sm font-semibold md:hidden">
             {env.NEXT_PUBLIC_APP_NAME}
           </Link>
 

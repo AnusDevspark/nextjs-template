@@ -32,7 +32,7 @@ export const navigation: NavGroup[] = [
     items: [
       {
         title: "Dashboard",
-        href: "/admin",
+        href: "/",
         icon: LayoutDashboardIcon,
       },
     ],

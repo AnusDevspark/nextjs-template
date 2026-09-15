@@ -74,7 +74,7 @@ export function LoginForm() {
         return;
       }
 
-      const target = next && next.startsWith("/") ? next : "/admin";
+      const target = next && next.startsWith("/") ? next : "/";
       window.location.assign(target);
     } catch {
       form.setError("root.serverError", {

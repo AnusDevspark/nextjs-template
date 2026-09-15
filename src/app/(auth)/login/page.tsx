@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Sign in" };
 export default async function LoginPage() {
   // A valid session here means the user reached /login by typing the URL.
   const session = await getSession();
-  if (session) redirect("/admin");
+  if (session) redirect("/");
 
   return (
     <div className="flex min-h-svh items-center justify-center p-4">
